@@ -1,0 +1,19 @@
+# .gitignore
+# build folders
+build/
+bin/
+lib/
+out/
+
+# IDE files
+.idea/
+.vscode/
+.cache/
+compile_commands.json
+
+# OS binary files
+*.so
+*.dylib
+*.exe
+*.o
+*.obj

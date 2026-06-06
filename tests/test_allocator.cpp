@@ -5,7 +5,7 @@
 TEST(AllocatorTest, AllocateAndDeallocateRawMemory)
 {
     mystl::Allocator<int> alloc;
-    int *ptr = alloc.allocate(10);
+    int* ptr = alloc.allocate(10);
 
     ASSERT_NE(ptr, nullptr); // Ensure that memory was allocated
 
@@ -17,7 +17,7 @@ TEST(AllocatorTest, ConstructAndDestroyObjects)
     mystl::Allocator<std::string> alloc;
 
     // Allocate memory for 1 string, but DO NOT call the constructor
-    std::string *ptr = alloc.allocate(1);
+    std::string* ptr = alloc.allocate(1);
 
     // Construct a string at this address, passing arguments (5 'a' characters)
     alloc.construct(ptr, 5, 'a');

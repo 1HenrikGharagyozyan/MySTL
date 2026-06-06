@@ -16,12 +16,12 @@ namespace mystl
 
         // Standard constructors
         constexpr Allocator() noexcept = default;
-        constexpr Allocator(const Allocator&) noexcept = default;
+        constexpr Allocator(const Allocator &) noexcept = default;
 
         template <typename U>
-        constexpr Allocator(const Allocator<U>&) noexcept {}
+        constexpr Allocator(const Allocator<U> &) noexcept {}
 
-        // 1. Raw memory allocation (without invoking constructors)
+        // 1. Raw memory allocation (without invoking object constructors)
         [[nodiscard]] pointer allocate(size_type n)
         {
             if (n > static_cast<size_type>(-1) / sizeof(T))
@@ -35,24 +35,24 @@ namespace mystl
             throw std::bad_alloc();
         }
 
-        // 2. Memory deallocation (without invoking destructors)
+        // 2. Memory deallocation (without invoking object destructors)
         void deallocate(pointer p, size_type n) noexcept
         {
-            (void)n; // In the standard base allocator, the size is ignored during deletion
+            (void)n; // In the standard base allocator, the size hint is ignored during deallocation.
             ::operator delete(p);
         }
 
-        // 3. Constructing an object at a specific address (Placement New)
+        // 3. Constructing an object at a specific address (placement new)
         template <typename U, typename... Args>
-        void construct(U* p, Args&&... args)
+        void construct(U *p, Args &&...args)
         {
-            // Invoke the constructor of U at address p, perfectly forwarding arguments
-            ::new (static_cast<void*>(p)) U(mystl::forward<Args>(args)...);
+            // Invoke the constructor of U at address p, perfectly forwarding arguments.
+            ::new (static_cast<void *>(p)) U(mystl::forward<Args>(args)...);
         }
 
-        // 4. Destroying an object (explicit destructor call)
+        // 4. Destroying an object (explicit destructor call).
         template <typename U>
-        void destroy(U* p)
+        void destroy(U *p)
         {
             p->~U();
         }
@@ -60,9 +60,9 @@ namespace mystl
 
     // Stateless allocators are always equal to each other
     template <typename T, typename U>
-    constexpr bool operator==(const Allocator<T>&, const Allocator<U>&) noexcept { return true; }
+    constexpr bool operator==(const Allocator<T> &, const Allocator<U> &) noexcept { return true; }
 
     template <typename T, typename U>
-    constexpr bool operator!=(const Allocator<T>&, const Allocator<U>&) noexcept { return false; }
+    constexpr bool operator!=(const Allocator<T> &, const Allocator<U> &) noexcept { return false; }
 
 } // namespace mystl

@@ -9,7 +9,7 @@ TEST(UtilityTest, MoveSemantics)
     std::string moved = mystl::move(original);
 
     EXPECT_EQ(moved, "hello");
-    // After moving, the original string should be empty (std::string behavior)
+    // After moving, the original string should be empty (std::string specific behavior)
     EXPECT_TRUE(original.empty());
 }
 

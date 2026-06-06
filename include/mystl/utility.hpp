@@ -15,12 +15,12 @@ namespace mystl
         using type = T;
     };
     template <typename T>
-    struct remove_reference<T &>
+    struct remove_reference<T&>
     {
         using type = T;
     };
     template <typename T>
-    struct remove_reference<T &&>
+    struct remove_reference<T&&>
     {
         using type = T;
     };

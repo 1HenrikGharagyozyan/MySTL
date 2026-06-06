@@ -11,15 +11,15 @@ namespace mystl
     struct Allocator
     {
         using value_type = T;
-        using pointer = T *;
+        using pointer = T*;
         using size_type = std::size_t;
 
         // Standard constructors
         constexpr Allocator() noexcept = default;
-        constexpr Allocator(const Allocator &) noexcept = default;
+        constexpr Allocator(const Allocator&) noexcept = default;
 
         template <typename U>
-        constexpr Allocator(const Allocator<U> &) noexcept {}
+        constexpr Allocator(const Allocator<U>&) noexcept {}
 
         // 1. Raw memory allocation (without invoking object constructors)
         [[nodiscard]] pointer allocate(size_type n)
@@ -44,7 +44,7 @@ namespace mystl
 
         // 3. Constructing an object at a specific address (placement new)
         template <typename U, typename... Args>
-        void construct(U *p, Args &&...args)
+        void construct(U* p, Args&&... args)
         {
             // Invoke the constructor of U at address p, perfectly forwarding arguments.
             ::new (static_cast<void *>(p)) U(mystl::forward<Args>(args)...);
@@ -60,9 +60,9 @@ namespace mystl
 
     // Stateless allocators are always equal to each other
     template <typename T, typename U>
-    constexpr bool operator==(const Allocator<T> &, const Allocator<U> &) noexcept { return true; }
+    constexpr bool operator==(const Allocator<T>& , const Allocator<U>& ) noexcept { return true; }
 
     template <typename T, typename U>
-    constexpr bool operator!=(const Allocator<T> &, const Allocator<U> &) noexcept { return false; }
+    constexpr bool operator!=(const Allocator<T>& , const Allocator<U>& ) noexcept { return false; }
 
 } // namespace mystl

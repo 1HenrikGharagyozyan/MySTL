@@ -11,9 +11,8 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     add_compile_options(-Wall -Wextra -Wpedantic -Werror)
 endif()
 
-# The library is header-only (similar to the standard STL)
-add_library(mystl INTERFACE)
-target_include_directories(mystl INTERFACE 
+add_library(mystl STATIC src/string.cpp)
+target_include_directories(mystl PUBLIC 
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
 )
 

@@ -11,7 +11,7 @@
 #include "utility.hpp"
 
 namespace mystl 
-    {
+{
 
     template <typename T, typename Allocator = mystl::Allocator<T>>
     class List 
@@ -58,7 +58,7 @@ namespace mystl
         using const_pointer = const T*;
 
         // ========================================================================
-        // ИТЕРАТОРЫ (Строго Bidirectional)
+        // ITERATORS (Strictly Bidirectional)
         // ========================================================================
         class ConstIterator;
 
@@ -93,13 +93,13 @@ namespace mystl
             bool operator==(const Iterator& rhs) const noexcept { return node_ == rhs.node_; }
             bool operator!=(const Iterator& rhs) const noexcept { return node_ != rhs.node_; }
             
-            // Кросс-сравнения с ConstIterator
+            // Cross-comparisons with ConstIterator
             bool operator==(const ConstIterator& rhs) const noexcept;
         };
 
         class ConstIterator 
         {
-            // ... Аналогично Iterator, но с const-типами и конструктором от Iterator
+            // ... Analogous to Iterator, but with const types and a constructor from Iterator
         private:
             const NodeBase* node_;
             friend class List;
@@ -130,7 +130,7 @@ namespace mystl
 
 
         // ========================================================================
-        // МЕТОДЫ ДОСТУПА
+        // ACCESS METHODS
         // ========================================================================
         iterator begin() noexcept { return iterator(sentinel_.next); }
         iterator end() noexcept { return iterator(&sentinel_); }
@@ -150,12 +150,12 @@ namespace mystl
         size_type size() const noexcept { return size_; }
 
         reference front() { return *begin(); }
-        reference back() { return *(--end()); } // Магия Sentinel: --end() работает всегда!
+        reference back() { return *(--end()); } // Sentinel magic: --end() always works!
         const_reference front() const { return *begin(); }
         const_reference back() const { return *(--end()); }
 
         // ========================================================================
-        // КОНСТРУКТОРЫ И RULE OF FIVE
+        // CONSTRUCTORS AND RULE OF FIVE
         // ========================================================================
         List() noexcept = default;
         ~List();
@@ -168,7 +168,7 @@ namespace mystl
 
 
         // ========================================================================
-        // МОДИФИКАТОРЫ
+        // MODIFIERS
         // ========================================================================
         template <typename... Args>
         iterator emplace(const_iterator pos, Args&&... args);
@@ -190,7 +190,7 @@ namespace mystl
         void swap(List& other) noexcept;
 
     private:
-        // Хелпер: связывает два узла вместе (помогает при вставке и удалении)
+        // Helper: links two nodes together (used during insertion and removal)
         void link_nodes(NodeBase* prev, NodeBase* next) noexcept 
         {
             prev->next = next;
@@ -205,10 +205,10 @@ namespace mystl
     }
 
     // ========================================================================
-    // РЕАЛИЗАЦИЯ ШАБЛОННЫХ МЕТОДОВ
+    // TEMPLATE METHOD IMPLEMENTATION
     // ========================================================================
 
-    // Деструктор
+    // Destructor
     template <typename T, typename Allocator>
     List<T, Allocator>::~List() 
     {
@@ -223,7 +223,7 @@ namespace mystl
             push_back(value);
     }
 
-    // Move Constructor (Кража указателей за O(1))
+    // Move Constructor (Stealing pointers in O(1))
     template <typename T, typename Allocator>
     List<T, Allocator>::List(List&& other) noexcept 
         : size_(other.size_)
@@ -231,15 +231,15 @@ namespace mystl
     {
         if (size_ > 0) 
         {
-            // Перехватываем связи от sentinel_ другого списка
+            // Steal the links from the other list's sentinel_
             sentinel_.next = other.sentinel_.next;
             sentinel_.prev = other.sentinel_.prev;
             
-            // Замыкаем украденные узлы на наш sentinel_
+            // Connect the stolen nodes to our sentinel_
             sentinel_.next->prev = &sentinel_;
             sentinel_.prev->next = &sentinel_;
             
-            // Переводим other в валидное пустое состояние
+            // Put other into a valid empty state
             other.sentinel_.next = &other.sentinel_;
             other.sentinel_.prev = &other.sentinel_;
             other.size_ = 0;
@@ -254,14 +254,14 @@ namespace mystl
             push_back(value);
     }
 
-    // Copy Assignment (Идиома Copy-and-Swap для строгой безопасности)
+    // Copy Assignment (Copy-and-Swap idiom for strong exception safety)
     template <typename T, typename Allocator>
     List<T, Allocator>& List<T, Allocator>::operator=(const List& other) 
     {
         if (this != &other) 
         {
-            List temp(other); // Создаем временный копию
-            swap(temp);       // Меняем содержимое с временной копией (безопасно при исключениях)
+            List temp(other); // Create a temporary copy
+            swap(temp);       // Swap contents with the temporary copy (safe with exceptions)
         }
         return *this;
     }
@@ -273,12 +273,12 @@ namespace mystl
         if (this != &other) 
         {
             clear();
-            swap(other); // Просто меняем содержимое (безопасно при исключениях)
+            swap(other); // Just swap the contents (safe with exceptions)
         }
         return *this;
     }
 
-    // Clear: Уничтожаем все узлы, оставляя только sentinel
+    // Clear: Destroy all nodes, leaving only the sentinel
     template <typename T, typename Allocator>
     void List<T, Allocator>::clear() noexcept 
     {
@@ -303,12 +303,11 @@ namespace mystl
     inline void List<T, Allocator>::swap(List & other) noexcept
     {
         mystl::swap(size_, other.size_);
-        // mystl::swap(alloc_, other.alloc_); // Опционально, если аллокатор имеет состояние
 
         mystl::swap(sentinel_.next, other.sentinel_.next);
         mystl::swap(sentinel_.prev, other.sentinel_.prev);
 
-        // Переподключаем "украденные" узлы к новым стражам
+        // Reconnect the "stolen" nodes to the new sentinels
         if (size_ > 0) 
         {
             sentinel_.next->prev = &sentinel_;
@@ -330,7 +329,7 @@ namespace mystl
         }
     }
 
-    // Emplace: Бесветвенная вставка
+    // Emplace: Efficient insertion
     template <typename T, typename Allocator>
     template <typename... Args>
     typename List<T, Allocator>::iterator List<T, Allocator>::emplace(const_iterator pos, Args&&... args) 
@@ -343,7 +342,7 @@ namespace mystl
         catch (...) 
         {
             alloc_.deallocate(new_node, 1);
-            throw; // Строгая гарантия исключений
+            throw; // Strong exception guarantee
         }
 
         NodeBase* current = const_cast<NodeBase*>(pos.node_);
@@ -356,17 +355,17 @@ namespace mystl
         return iterator(new_node);
     }
 
-    // Erase: Бесветвенное удаление
+    // Erase: Efficient removal
     template <typename T, typename Allocator>
     typename List<T, Allocator>::iterator List<T, Allocator>::erase(const_iterator pos) 
     {
         NodeBase* node_to_erase = const_cast<NodeBase*>(pos.node_);
         NodeBase* next_node = node_to_erase->next;
         
-        // Исключаем узел из кольца
+        // Remove the node from the ring
         link_nodes(node_to_erase->prev, node_to_erase->next);
         
-        // Уничтожаем объект и освобождаем память
+        // Destroy the object and release the memory
         Node* node = static_cast<Node*>(node_to_erase);
         alloc_.destroy(node);
         alloc_.deallocate(node, 1);
@@ -376,7 +375,7 @@ namespace mystl
     }
 
     // ========================================================================
-    // ГЛОБАЛЬНЫЕ ОПЕРАТОРЫ И ФУНКЦИИ
+    // GLOBAL OPERATORS AND FUNCTIONS
     // ========================================================================
 
     template <typename T, typename Allocator>
@@ -387,7 +386,8 @@ namespace mystl
         auto it2 = rhs.begin();
         while (it1 != lhs.end()) 
         {
-            if (*it1 != *it2) return false;
+            if (*it1 != *it2) 
+                return false;
             ++it1;
             ++it2;
         }

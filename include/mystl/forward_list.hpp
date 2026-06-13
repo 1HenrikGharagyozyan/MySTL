@@ -177,6 +177,22 @@ namespace mystl
 
         void pop_front() { erase_after(before_begin()); }
 
+        // ========================================================================
+        // АЛГОРИТМЫ (Zero-Allocation Pointer Manipulation)
+        // ========================================================================
+
+        // Разворот списка за O(N) времени и O(1) памяти
+        void reverse() noexcept;
+        
+        // Удаление идущих подряд дубликатов за O(N)
+        void unique();
+
+        // Слияние двух отсортированных списков за O(N)
+        void merge(ForwardList& other) noexcept;
+
+        // Сортировка слиянием (Bottom-Up Merge Sort) за O(N log N)
+        void sort();
+
     private:
         // Хелперы для управления памятью (чтобы не дублировать try/catch)
         template <typename... Args>
@@ -288,6 +304,147 @@ namespace mystl
             destroy_node(static_cast<Node*>(node_to_erase));
         }
         return iterator(current->next);
+    }
+
+    template<typename T, typename Allocator>
+    inline void ForwardList<T, Allocator>::reverse() noexcept
+    {
+        NodeBase* prev = nullptr;
+        NodeBase* current = head_.next;
+        
+        while (current) 
+        {
+            NodeBase* next_node = current->next;
+            current->next = prev;
+            prev = current;
+            current = next_node;
+        }
+        head_.next = prev;
+    }
+
+    template<typename T, typename Allocator>
+    inline void ForwardList<T, Allocator>::unique()
+    {
+        NodeBase* current = head_.next;
+        if (!current) 
+            return;
+
+        while (current->next) 
+        {
+            Node* curr_node = static_cast<Node*>(current);
+            Node* next_node = static_cast<Node*>(current->next);
+
+            if (curr_node->data == next_node->data) 
+            {
+                NodeBase* duplicate = current->next;
+                current->next = duplicate->next;
+                destroy_node(static_cast<Node*>(duplicate));
+            } 
+            else 
+            {
+                current = current->next;
+            }
+        }
+    }
+
+    template<typename T, typename Allocator>
+    inline void ForwardList<T, Allocator>::merge(ForwardList& other) noexcept
+    {
+        if (this == &other) 
+            return;
+
+        NodeBase* a = head_.next;
+        NodeBase* b = other.head_.next;
+        NodeBase* tail = &head_; // Строим прямо на нашем фиктивном узле
+
+        while (a && b) 
+        {
+            // Используем оператор < для сравнения
+            if (static_cast<Node*>(b)->data < static_cast<Node*>(a)->data) 
+            {
+                tail->next = b;
+                b = b->next;
+            } 
+            else 
+            {
+                tail->next = a;
+                a = a->next;
+            }
+            tail = tail->next;
+        }
+        
+        // Прицепляем остатки
+        tail->next = a ? a : b;
+        other.head_.next = nullptr;
+    }
+
+    template<typename T, typename Allocator>
+    inline void ForwardList<T, Allocator>::sort()
+    {
+        if (!head_.next || !head_.next->next) 
+            return;
+
+        size_type list_size = 1;
+        while (true) 
+        {
+            NodeBase* current = head_.next;
+            head_.next = nullptr;
+            NodeBase* tail = &head_;
+            size_type merges_done = 0;
+
+            while (current) 
+            {
+                NodeBase* left = current;
+                NodeBase* right = nullptr;
+                size_type left_size = 0;
+                size_type right_size = 0;
+
+                // Отмеряем левую часть
+                for (size_type i = 0; i < list_size && current; ++i) 
+                {
+                    ++left_size;
+                    current = current->next;
+                }
+
+                right = current;
+
+                // Отмеряем правую часть
+                for (size_type i = 0; i < list_size && current; ++i) 
+                {
+                    ++right_size;
+                    current = current->next;
+                }
+
+                // Сливаем left и right
+                while (left_size > 0 || right_size > 0) 
+                {
+                    if (left_size == 0) 
+                    {
+                        tail->next = right; right = right->next; --right_size;
+                    } 
+                    else if (right_size == 0) 
+                    {
+                        tail->next = left; left = left->next; --left_size;
+                    } 
+                    else if (static_cast<Node*>(right)->data < static_cast<Node*>(left)->data) 
+                    {
+                        tail->next = right; right = right->next; --right_size;
+                    } 
+                    else 
+                    {
+                        tail->next = left; left = left->next; --left_size;
+                    }
+                    tail = tail->next;
+                }
+                tail->next = nullptr; // Закрываем хвост
+                ++merges_done;
+            }
+
+            // Если за проход был только один фрагмент, список отсортирован
+            if (merges_done <= 1) break;
+            
+            list_size *= 2;
+        }
     }
 
     template<typename T, typename Allocator>

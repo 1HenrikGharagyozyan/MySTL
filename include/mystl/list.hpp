@@ -189,6 +189,23 @@ namespace mystl
 
         void swap(List& other) noexcept;
 
+        // ========================================================================
+        // ALGORITHMS FOR A DOUBLY LINKED LIST (Zero-Allocation Pointer Manipulation)
+        // ========================================================================
+
+        // Reverse a doubly linked list in O(N) time and O(1) extra memory
+        void reverse() noexcept;
+
+        // Remove consecutive duplicates in O(N)
+        void unique();
+
+        // Merge two sorted lists in O(N)
+        void merge(List& other);
+
+        // Merge sort (sorts in O(N log N) time and O(1) extra memory)
+        // This is the production-grade implementation from GCC STL
+        void sort();
+
     private:
         // Helper: links two nodes together (used during insertion and removal)
         void link_nodes(NodeBase* prev, NodeBase* next) noexcept 
@@ -326,6 +343,141 @@ namespace mystl
         else 
         {
             other.sentinel_.next = other.sentinel_.prev = &other.sentinel_;
+        }
+    }
+
+    template<typename T, typename Allocator>
+    inline void List<T, Allocator>::reverse() noexcept
+    {
+        if (size_ <= 1) 
+            return;
+
+        NodeBase* current = &sentinel_;
+        do {
+            // In each node (including the sentinel), simply swap next and prev.
+            mystl::swap(current->next, current->prev);
+
+            // Since we just swapped them, the old next is now in prev.
+            // Move to the next node by following the prev pointer.
+            current = current->prev; 
+        } while (current != &sentinel_);
+    }
+
+    template<typename T, typename Allocator>
+    inline void List<T, Allocator>::unique()
+    {
+        if (size_ <= 1) 
+            return;
+
+        iterator it = begin();
+        iterator next_it = it;
+        ++next_it;
+
+        while (next_it != end()) 
+        {
+            if (*it == *next_it) 
+            {
+                next_it = erase(next_it); // erase will itself decrement size_ and remove the node
+            } 
+            else 
+            {
+                it = next_it;
+                ++next_it;
+            }
+        }
+    }
+
+    template<typename T, typename Allocator>
+    inline void List<T, Allocator>::merge(List& other)
+    {
+        if (this == &other || other.empty()) 
+            return;
+
+        iterator it1 = begin();
+        iterator it2 = other.begin();
+
+        while (it1 != end() && it2 != other.end()) 
+        {
+            if (*it2 < *it1) 
+            {
+                // Remove the node from the other list (without allocations!)
+                NodeBase* node_to_move = it2.node_;
+                ++it2;
+
+                other.link_nodes(node_to_move->prev, node_to_move->next);
+                --other.size_;
+
+                // Insert the node into our list directly before it1
+                NodeBase* curr = it1.node_;
+                NodeBase* prev_node = curr->prev;
+
+                link_nodes(prev_node, node_to_move);
+                link_nodes(node_to_move, curr);
+                ++size_;
+            } 
+            else 
+            {
+                ++it1;
+            }
+        }
+
+        // If other still has elements, move its remaining portion to the end of our list
+        if (!other.empty()) 
+        {
+            NodeBase* first_rem = other.sentinel_.next;
+            NodeBase* last_rem = other.sentinel_.prev;
+            NodeBase* my_last = sentinel_.prev;
+
+            link_nodes(my_last, first_rem);
+            link_nodes(last_rem, &sentinel_);
+
+            size_ += other.size_;
+
+            // Put other back into a valid empty state
+            other.sentinel_.next = &other.sentinel_;
+            other.sentinel_.prev = &other.sentinel_;
+            other.size_ = 0;
+        }
+    }
+
+    template<typename T, typename Allocator>
+    inline void List<T, Allocator>::sort()
+    {
+        if (size_ <= 1) 
+            return;
+
+        // An array of temporary list buffers for bottom-up merge sort
+        // 64 buffers are enough for 2^64 elements
+        List carry;
+        List counter[64];
+        int fill = 0;
+
+        while (!empty()) 
+        {
+            // Detach the first node from our list and move it to carry
+            NodeBase* node = sentinel_.next;
+            link_nodes(&sentinel_, node->next);
+            --size_;
+
+            carry.link_nodes(&carry.sentinel_, node);
+            carry.link_nodes(node, &carry.sentinel_);
+            carry.size_ = 1;
+
+            int i = 0;
+            while (i < fill && !counter[i].empty()) 
+            {
+                counter[i].merge(carry);
+                carry.swap(counter[i]);
+                ++i;
+            }
+            carry.swap(counter[i]);
+            if (i == fill) ++fill;
+        }
+
+        // Reassemble all runs back together
+        for (int i = 0; i < fill; ++i) 
+        {
+            merge(counter[i]);
         }
     }
 

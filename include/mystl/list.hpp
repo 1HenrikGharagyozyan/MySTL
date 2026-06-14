@@ -35,7 +35,7 @@ namespace mystl
             
             template<typename... Args>
             explicit Node(Args&&... args) 
-                : data(std::forward<Args>(args)...) 
+                : data(mystl::forward<Args>(args)...) 
             {
             }
         };

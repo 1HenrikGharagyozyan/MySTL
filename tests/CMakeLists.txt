@@ -33,3 +33,7 @@ gtest_discover_tests(test_deque)
 add_executable(test_stack test_stack.cpp)
 target_link_libraries(test_stack PRIVATE mystl GTest::gtest_main)
 gtest_discover_tests(test_stack)
+
+add_executable(test_queue test_queue.cpp)
+target_link_libraries(test_queue PRIVATE mystl GTest::gtest_main)
+gtest_discover_tests(test_queue)

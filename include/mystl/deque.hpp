@@ -235,7 +235,7 @@ namespace mystl
             , finish_(other.finish_)
             , map_(other.map_)
             , map_size_(other.map_size_)
-            , alloc_(std::move(other.alloc_)) 
+            , alloc_(mystl::move(other.alloc_)) 
         {
             other.map_ = nullptr;
             other.map_size_ = 0;
@@ -368,12 +368,12 @@ namespace mystl
         {
             if (finish_.cur != finish_.last - 1) 
             {
-                std::allocator_traits<Allocator>::construct(alloc_, finish_.cur, std::forward<Args>(args)...);
+                std::allocator_traits<Allocator>::construct(alloc_, finish_.cur, mystl::forward<Args>(args)...);
                 reference ref = *finish_.cur;
                 ++finish_;
                 return ref;
             }
-            return *push_back_aux(std::forward<Args>(args)...);
+            return *push_back_aux(mystl::forward<Args>(args)...);
         }
 
         template <typename... Args>
@@ -382,10 +382,10 @@ namespace mystl
             if (start_.cur != start_.first) 
             {
                 --start_;
-                std::allocator_traits<Allocator>::construct(alloc_, start_.cur, std::forward<Args>(args)...);
+                std::allocator_traits<Allocator>::construct(alloc_, start_.cur, mystl::forward<Args>(args)...);
                 return *start_.cur;
             }
-            return *push_front_aux(std::forward<Args>(args)...);
+            return *push_front_aux(mystl::forward<Args>(args)...);
         }
 
         void pop_back() noexcept 
@@ -523,7 +523,7 @@ namespace mystl
             *(finish_.node + 1) = std::allocator_traits<Allocator>::allocate(alloc_, buffer_size());
             try 
             {
-                std::allocator_traits<Allocator>::construct(alloc_, finish_.cur, std::forward<Args>(args)...);
+                std::allocator_traits<Allocator>::construct(alloc_, finish_.cur, mystl::forward<Args>(args)...);
                 finish_.set_node(finish_.node + 1);
                 finish_.cur = finish_.first;
                 return finish_ - 1;
@@ -544,7 +544,7 @@ namespace mystl
             {
                 start_.set_node(start_.node - 1);
                 start_.cur = start_.last - 1;
-                std::allocator_traits<Allocator>::construct(alloc_, start_.cur, std::forward<Args>(args)...);
+                std::allocator_traits<Allocator>::construct(alloc_, start_.cur, mystl::forward<Args>(args)...);
                 return start_;
             } 
             catch (...) 

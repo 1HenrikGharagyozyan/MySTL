@@ -1,64 +1,99 @@
 #pragma once
 
+#include <cstddef> // Для std::size_t
+
 namespace mystl
 {
 
     // ========================================================================
-    // 1. TYPE TRAITS
+    // 1. TYPE TRAITS (REFERENCE MODIFIERS)
     // ========================================================================
 
-    // remove_reference: removes reference qualifiers from a type (T& -> T, T&& -> T).
-    // This is essential for the correct implementation of mystl::move and mystl::forward.
-    template <typename T>
-    struct remove_reference
-    {
-        using type = T;
-    };
-    template <typename T>
-    struct remove_reference<T&>
-    {
-        using type = T;
-    };
-    template <typename T>
-    struct remove_reference<T&&>
-    {
-        using type = T;
-    };
+    template <typename T> struct remove_reference { using type = T; };
+    template <typename T> struct remove_reference<T&> { using type = T; };
+    template <typename T> struct remove_reference<T&&> { using type = T; };
 
-    // Helper alias for C++14/17+
     template <typename T>
     using remove_reference_t = typename remove_reference<T>::type;
 
     // ========================================================================
-    // 2. MOVE SEMANTICS & PERFECT FORWARDING
+    // 2. TYPE TRANSFORMATIONS (CV & DECAY)
     // ========================================================================
 
-    // mystl::move
-    // Unconditionally casts the passed object to an rvalue reference (T&&).
-    // constexpr noexcept ensures there is no runtime overhead.
+    template <typename T> struct remove_const { using type = T; };
+    template <typename T> struct remove_const<const T> { using type = T; };
+
+    template <typename T> struct remove_volatile { using type = T; };
+    template <typename T> struct remove_volatile<volatile T> { using type = T; };
+
+    template <typename T> 
+    struct remove_cv 
+    { 
+        using type = typename remove_volatile<typename remove_const<T>::type>::type; 
+    };
+    
+    template <typename T> 
+    using remove_cv_t = typename remove_cv<T>::type;
+
+    // Скрытые детали реализации decay
+    namespace detail 
+    {
+        template <typename T> struct decay_impl { using type = remove_cv_t<T>; };
+        // Распад массивов в указатели
+        template <typename T, std::size_t N> struct decay_impl<T[N]> { using type = T*; };
+        template <typename T> struct decay_impl<T[]> { using type = T*; };
+        // Распад функций в указатели на функции
+        template <typename R, typename... Args> struct decay_impl<R(Args...)> { using type = R(*)(Args...); };
+    }
+
+    template <typename T> 
+    struct decay 
+    { 
+        using type = typename detail::decay_impl<remove_reference_t<T>>::type; 
+    };
+
+    template <typename T> 
+    using decay_t = typename decay<T>::type;
+
+    // ========================================================================
+    // 3. FUNDAMENTAL TYPE TRAITS (SFINAE)
+    // ========================================================================
+
+    template <typename T, typename U> struct is_same { static constexpr bool value = false; };
+    template <typename T> struct is_same<T, T> { static constexpr bool value = true; };
+
+    template <typename T, typename U>
+    inline constexpr bool is_same_v = is_same<T, U>::value;
+
+    template <bool B, typename T = void> struct enable_if {};
+    template <typename T> struct enable_if<true, T> { using type = T; };
+
+    template <bool B, typename T = void>
+    using enable_if_t = typename enable_if<B, T>::type;
+
+    // ========================================================================
+    // 4. MOVE SEMANTICS & PERFECT FORWARDING
+    // ========================================================================
+
     template <typename T>
     constexpr remove_reference_t<T>&& move(T&& arg) noexcept
     {
         return static_cast<remove_reference_t<T>&&>(arg);
     }
 
-    // mystl::forward
-    // Preserves the value category (lvalue remains lvalue, rvalue remains rvalue).
-    // Crucial for implementing perfect forwarding in constructors and allocators.
     template <typename T>
     constexpr T&& forward(remove_reference_t<T>& arg) noexcept
     {
-        return static_cast<T &&>(arg);
+        return static_cast<T&&>(arg);
     }
 
     template <typename T>
     constexpr T&& forward(remove_reference_t<T>&& arg) noexcept
     {
-        return static_cast<T &&>(arg);
+        return static_cast<T&&>(arg);
     }
 
-    // mystl::swap: Swaps the values of two objects.
-    template <typename T> // Requires T to be MoveConstructible and MoveAssignable.
+    template <typename T> 
     constexpr void swap(T& a, T& b) noexcept
     {
         T temp = mystl::move(a);
@@ -67,7 +102,7 @@ namespace mystl
     }
 
     // ========================================================================
-    // 3. mystl::Pair
+    // 5. mystl::Pair
     // ========================================================================
 
     template <typename T1, typename T2>
@@ -76,34 +111,24 @@ namespace mystl
         T1 first;
         T2 second;
 
-        // Default constructor
-        constexpr Pair() // Default-constructs first and second.
-            : first(), second()
-        {
-        }
+        constexpr Pair() : first(), second() {}
 
-        // Copy constructor for lvalue references.
-        constexpr Pair(const T1 &x, const T2 &y)
-            : first(x), second(y)
-        {
-        }
+        constexpr Pair(const T1& x, const T2& y) : first(x), second(y) {}
 
         template <typename U1, typename U2>
-        // Perfect forwarding constructor for any types U1, U2.
-        constexpr Pair(U1 &&x, U2 &&y)
-            : first(mystl::forward<U1>(x)), second(mystl::forward<U2>(y))
+        constexpr Pair(U1&& x, U2&& y)
+            : first(mystl::forward<U1>(x))
+            , second(mystl::forward<U2>(y))
         {
         }
 
-        // Rule of Five: the compiler will generate efficient move/copy constructors and assignment operators
-        Pair(const Pair &) = default;                // Copy constructor
-        Pair(Pair &&) noexcept = default;            // Move constructor
-        Pair &operator=(const Pair &) = default;     // Copy assignment operator
-        Pair &operator=(Pair &&) noexcept = default; // Move assignment operator
-        ~Pair() = default;                           // Destructor
+        Pair(const Pair&) = default;               
+        Pair(Pair&&) noexcept = default;           
+        Pair& operator=(const Pair&) = default;    
+        Pair& operator=(Pair&&) noexcept = default;
+        ~Pair() = default;                          
 
-        // Swaps the contents of this Pair with another Pair.
-        void swap(Pair &other) noexcept
+        void swap(Pair& other) noexcept
         {
             T1 temp1 = mystl::move(first);
             first = mystl::move(other.first);
@@ -115,12 +140,55 @@ namespace mystl
         }
     };
 
-    // Helper function mystl::make_pair for type deduction.
+    // make_pair теперь использует decay_t
     template <typename T1, typename T2>
-    constexpr Pair<remove_reference_t<T1>, remove_reference_t<T2>> make_pair(T1 &&x, T2 &&y)
+    constexpr Pair<decay_t<T1>, decay_t<T2>> make_pair(T1&& x, T2&& y)
     {
-        return Pair<remove_reference_t<T1>, remove_reference_t<T2>>(
+        return Pair<decay_t<T1>, decay_t<T2>>(
             mystl::forward<T1>(x), mystl::forward<T2>(y));
+    }
+
+    // Операторы сравнения
+    template <typename T1, typename T2>
+    constexpr bool operator==(const Pair<T1, T2>& lhs, const Pair<T1, T2>& rhs) 
+    { 
+        return lhs.first == rhs.first && lhs.second == rhs.second; 
+    }
+
+    template <typename T1, typename T2>
+    constexpr bool operator!=(const Pair<T1, T2>& lhs, const Pair<T1, T2>& rhs) 
+    { 
+        return !(lhs == rhs); 
+    }
+
+    template <typename T1, typename T2>
+    constexpr bool operator<(const Pair<T1, T2>& lhs, const Pair<T1, T2>& rhs) 
+    { 
+        return lhs.first < rhs.first || (!(rhs.first < lhs.first) && lhs.second < rhs.second); 
+    }
+
+    template <typename T1, typename T2>
+    constexpr bool operator>(const Pair<T1, T2>& lhs, const Pair<T1, T2>& rhs) 
+    { 
+        return rhs < lhs; 
+    }
+
+    template <typename T1, typename T2>
+    constexpr bool operator<=(const Pair<T1, T2>& lhs, const Pair<T1, T2>& rhs) 
+    { 
+        return !(rhs < lhs); 
+    }
+
+    template <typename T1, typename T2>
+    constexpr bool operator>=(const Pair<T1, T2>& lhs, const Pair<T1, T2>& rhs) 
+    { 
+        return !(lhs < rhs); 
+    }
+
+    template <typename T1, typename T2>
+    constexpr void swap(Pair<T1, T2>& lhs, Pair<T1, T2>& rhs) noexcept
+    { 
+        lhs.swap(rhs); 
     }
 
 } // namespace mystl

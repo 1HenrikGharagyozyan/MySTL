@@ -37,29 +37,29 @@ namespace mystl
     // Unconditionally casts the passed object to an rvalue reference (T&&).
     // constexpr noexcept ensures there is no runtime overhead.
     template <typename T>
-    constexpr remove_reference_t<T> &&move(T &&arg) noexcept
+    constexpr remove_reference_t<T>&& move(T&& arg) noexcept
     {
-        return static_cast<remove_reference_t<T> &&>(arg);
+        return static_cast<remove_reference_t<T>&&>(arg);
     }
 
     // mystl::forward
     // Preserves the value category (lvalue remains lvalue, rvalue remains rvalue).
     // Crucial for implementing perfect forwarding in constructors and allocators.
     template <typename T>
-    constexpr T &&forward(remove_reference_t<T> &arg) noexcept
+    constexpr T&& forward(remove_reference_t<T>& arg) noexcept
     {
         return static_cast<T &&>(arg);
     }
 
     template <typename T>
-    constexpr T &&forward(remove_reference_t<T> &&arg) noexcept
+    constexpr T&& forward(remove_reference_t<T>&& arg) noexcept
     {
         return static_cast<T &&>(arg);
     }
 
     // mystl::swap: Swaps the values of two objects.
     template <typename T> // Requires T to be MoveConstructible and MoveAssignable.
-    constexpr void swap(T &a, T &b) noexcept
+    constexpr void swap(T& a, T& b) noexcept
     {
         T temp = mystl::move(a);
         a = mystl::move(b);

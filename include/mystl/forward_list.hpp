@@ -15,7 +15,7 @@ namespace mystl
     class ForwardList 
     {
     private:
-        // Базовый узел: хранит только указатель (решает проблему фиктивных узлов)
+        // Base node: stores only a pointer (solves the dummy-node problem)
         struct NodeBase 
         {
             NodeBase* next;
@@ -25,7 +25,7 @@ namespace mystl
             }
         };
 
-        // Узел с данными
+        // Node with data
         struct Node : public NodeBase 
         {
             T data;
@@ -36,7 +36,7 @@ namespace mystl
             }
         };
 
-        NodeBase head_; // Фиктивный узел (before_begin). head_.next — это первый реальный элемент.
+        NodeBase head_; // Dummy node (before_begin). head_.next is the first real element.
 
         using allocator_traits = std::allocator_traits<Allocator>;
         using node_allocator_type = typename allocator_traits::template rebind_alloc<Node>;
@@ -52,7 +52,7 @@ namespace mystl
         using const_pointer = const T*;
 
         // ========================================================================
-        // ИТЕРАТОРЫ (Только Forward)
+        // ITERATORS (Forward Only)
         // ========================================================================
         class ConstIterator;
 
@@ -120,7 +120,7 @@ namespace mystl
 	    using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
         // ========================================================================
-        // МЕТОДЫ ДОСТУПА
+        // ACCESS METHODS
         // ========================================================================
         iterator before_begin() noexcept { return iterator(&head_); }
         const_iterator before_begin() const noexcept { return const_iterator(&head_); }
@@ -146,7 +146,7 @@ namespace mystl
         const_reference front() const { return *begin(); }
 
         // ========================================================================
-        // КОНСТРУКТОРЫ И RULE OF FIVE
+        // CONSTRUCTORS AND RULE OF FIVE
         // ========================================================================
         ForwardList() noexcept = default;
         ~ForwardList();
@@ -158,7 +158,7 @@ namespace mystl
         ForwardList& operator=(ForwardList&& other) noexcept;
 
         // ========================================================================
-        // МОДИФИКАТОРЫ
+        // MODIFIERS
         // ========================================================================
         void swap(ForwardList& other) noexcept { mystl::swap(head_.next, other.head_.next); }
 
@@ -178,23 +178,23 @@ namespace mystl
         void pop_front() { erase_after(before_begin()); }
 
         // ========================================================================
-        // АЛГОРИТМЫ (Zero-Allocation Pointer Manipulation)
+        // ALGORITHMS (Zero-Allocation Pointer Manipulation)
         // ========================================================================
 
-        // Разворот списка за O(N) времени и O(1) памяти
+        // Reverse the list in O(N) time and O(1) extra memory
         void reverse() noexcept;
-        
-        // Удаление идущих подряд дубликатов за O(N)
+
+        // Remove consecutive duplicates in O(N)
         void unique();
 
-        // Слияние двух отсортированных списков за O(N)
+        // Merge two sorted lists in O(N)
         void merge(ForwardList& other) noexcept;
 
-        // Сортировка слиянием (Bottom-Up Merge Sort) за O(N log N)
+        // Merge sort (bottom-up merge sort) in O(N log N)
         void sort();
 
     private:
-        // Хелперы для управления памятью (чтобы не дублировать try/catch)
+        // Helpers for memory management (to avoid duplicating try/catch)
         template <typename... Args>
         Node* create_node(Args&&... args) 
         {
@@ -355,11 +355,11 @@ namespace mystl
 
         NodeBase* a = head_.next;
         NodeBase* b = other.head_.next;
-        NodeBase* tail = &head_; // Строим прямо на нашем фиктивном узле
+        NodeBase* tail = &head_; // Build directly on our dummy node
 
         while (a && b) 
         {
-            // Используем оператор < для сравнения
+            // Use the < operator for comparison
             if (static_cast<Node*>(b)->data < static_cast<Node*>(a)->data) 
             {
                 tail->next = b;
@@ -373,7 +373,7 @@ namespace mystl
             tail = tail->next;
         }
         
-        // Прицепляем остатки
+        // Attach the remaining nodes
         tail->next = a ? a : b;
         other.head_.next = nullptr;
     }
@@ -399,7 +399,7 @@ namespace mystl
                 size_type left_size = 0;
                 size_type right_size = 0;
 
-                // Отмеряем левую часть
+                // Measure out the left part
                 for (size_type i = 0; i < list_size && current; ++i) 
                 {
                     ++left_size;
@@ -408,14 +408,14 @@ namespace mystl
 
                 right = current;
 
-                // Отмеряем правую часть
+                // Measure out the right part
                 for (size_type i = 0; i < list_size && current; ++i) 
                 {
                     ++right_size;
                     current = current->next;
                 }
 
-                // Сливаем left и right
+                // Merge left and right
                 while (left_size > 0 || right_size > 0) 
                 {
                     if (left_size == 0) 
@@ -436,11 +436,11 @@ namespace mystl
                     }
                     tail = tail->next;
                 }
-                tail->next = nullptr; // Закрываем хвост
+                tail->next = nullptr; // Close the tail
                 ++merges_done;
             }
 
-            // Если за проход был только один фрагмент, список отсортирован
+            // If only one run was produced in this pass, the list is sorted
             if (merges_done <= 1) break;
             
             list_size *= 2;
@@ -479,7 +479,7 @@ namespace mystl
             ++it1;
             ++it2;
         }
-        return it1 == lhs.end() && it2 == rhs.end(); // Проверяем, что оба списка закончились одновременно
+        return it1 == lhs.end() && it2 == rhs.end(); // Verify that both lists ended at the same time
     }
 
     template <typename T, typename Allocator>

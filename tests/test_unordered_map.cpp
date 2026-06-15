@@ -24,7 +24,7 @@ TEST(UnorderedMapTest, InsertAndFind)
     ASSERT_NE(it, map.end());
     EXPECT_EQ(it->second, "HydraEngine");
 
-    // Повторный insert того же ключа должен провалиться
+    // Re-inserting the same key should fail
     auto res3 = map.insert({1, "Fake"});
     EXPECT_FALSE(res3.second);
     EXPECT_EQ(map.size(), 2);
@@ -39,7 +39,7 @@ TEST(UnorderedMapTest, BracketOperator)
     EXPECT_EQ(map["RenderThreads"], 4);
     EXPECT_EQ(map.at("WindowWidth"), 1920);
 
-    // Доступ по несуществующему ключу через [] должен создать дефолтный элемент
+    // Accessing a non-existent key via [] should create a default element
     EXPECT_EQ(map["FPS"], 0); 
     EXPECT_EQ(map.size(), 3);
 }
@@ -55,7 +55,7 @@ TEST(UnorderedMapTest, EraseElements)
     EXPECT_EQ(map.size(), 2);
     EXPECT_EQ(map.find(20), map.end());
 
-    // Удаление несуществующего ключа
+    // Deleting a non-existent key
     EXPECT_EQ(map.erase(99), 0);
 }
 

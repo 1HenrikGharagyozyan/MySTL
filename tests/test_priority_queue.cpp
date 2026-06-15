@@ -21,7 +21,7 @@ TEST(PriorityQueueTest, PushAndTopMaxHeap)
     pq.push(20);
     pq.push(5);
 
-    // В Max-Heap сверху всегда самый большой элемент
+    // In a max-heap, the top element is always the largest
     EXPECT_EQ(pq.size(), 4);
     EXPECT_EQ(pq.top(), 30);
 }
@@ -33,7 +33,7 @@ TEST(PriorityQueueTest, PopSequence)
     pq.push(30);
     pq.push(20);
 
-    // Должны выходить строго по убыванию
+    // They should come out in strictly descending order
     EXPECT_EQ(pq.top(), 30);
     pq.pop();
     
@@ -48,14 +48,14 @@ TEST(PriorityQueueTest, PopSequence)
 
 TEST(PriorityQueueTest, MinHeapWithGreater) 
 {
-    // Передаем std::greater, чтобы сделать Min-Heap
+    // We pass std::greater to make a min-heap
     PriorityQueue<int, std::vector<int>, std::greater<int>> pq;
     
     pq.push(50);
     pq.push(10);
     pq.push(40);
 
-    // Теперь сверху должен быть самый маленький элемент
+    // Now the smallest element should be at the top
     EXPECT_EQ(pq.top(), 10);
     pq.pop();
     EXPECT_EQ(pq.top(), 40);
@@ -65,7 +65,7 @@ TEST(PriorityQueueTest, ConstructorFromRange)
 {
     std::vector<int> vec = {10, 50, 20, 30, 15};
     
-    // Вызовется make_heap внутри конструктора
+    // make_heap will be invoked inside the constructor
     PriorityQueue<int> pq(vec.begin(), vec.end());
     
     EXPECT_EQ(pq.size(), 5);

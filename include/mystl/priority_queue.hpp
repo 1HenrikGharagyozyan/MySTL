@@ -1,7 +1,7 @@
 #pragma once
 
 #include "utility.hpp"
-#include "algorithm.hpp" // Наши алгоритмы кучи
+#include "algorithm.hpp" // Our heap algorithms
 #include "vector.hpp"   
 
 #include <cassert>
@@ -23,7 +23,7 @@ namespace mystl
         using const_reference = typename Container::const_reference;
 
         // ========================================================================
-        // КОНСТРУКТОРЫ
+        // CONSTRUCTORS
         // ========================================================================
         
         PriorityQueue() : c_(), comp_() {}
@@ -39,7 +39,7 @@ namespace mystl
         }
 
         // ========================================================================
-        // ДОСТУП И ВМЕСТИМОСТЬ
+        // ACCESS AND CAPACITY
         // ========================================================================
 
         [[nodiscard]] const_reference top() const 
@@ -52,7 +52,7 @@ namespace mystl
         [[nodiscard]] size_type size() const noexcept { return c_.size(); }
 
         // ========================================================================
-        // МОДИФИКАТОРЫ
+        // MODIFIERS
         // ========================================================================
 
         void push(const value_type& value) 

@@ -5,7 +5,7 @@
 
 namespace mystl 
 {
-    // Компаратор по умолчанию
+    // Default comparator
     template <typename T>
     struct less 
     {
@@ -24,27 +24,27 @@ namespace mystl
         }
     };
 
-    // Вспомогательная функция просеивания вниз (O(log N))
+    // Helper function for sift-down (O(log N))
     template <typename RandomIt, typename Distance, typename Compare>
     void sift_down(RandomIt first, Distance len, Distance start, Compare comp) 
     {
         Distance parent = start;
-        // Запоминаем просеиваемый элемент (через move-семантику)
+        // Remember the sifted element (via move semantics)
         auto value = mystl::move(*(first + parent)); 
 
         while (true) 
         {
-            Distance child = 2 * parent + 1; // Левый потомок
+            Distance child = 2 * parent + 1; // Left child
             if (child >= len) 
                 break;
 
-            // Выбираем наибольшего потомка
+            // Select the larger child
             if (child + 1 < len && comp(*(first + child), *(first + child + 1))) 
             {
                 child++;
             }
 
-            // Если родитель меньше потомка, поднимаем потомка наверх
+            // If the parent is smaller than the child, move the child up
             if (comp(value, *(first + child))) 
             {
                 *(first + parent) = mystl::move(*(first + child));
@@ -55,7 +55,7 @@ namespace mystl
                 break;
             }
         }
-        // Ставим элемент на его законное место
+        // Place the element in its rightful position
         *(first + parent) = mystl::move(value); 
     }
 
@@ -70,7 +70,7 @@ namespace mystl
         Distance child = len - 1;
         auto value = mystl::move(*(last - 1));
 
-        // Просеивание вверх (O(log N))
+        // Sift-up (O(log N))
         while (child > 0) 
         {
             Distance parent = (child - 1) / 2;
@@ -91,9 +91,9 @@ namespace mystl
     void pop_heap(RandomIt first, RandomIt last, Compare comp) 
     {
         if (last - first < 2) return;
-        // Меняем корень (первый элемент) с последним
+        // Swap the root (first element) with the last one
         mystl::swap(*first, *(last - 1));
-        // Восстанавливаем свойство кучи для оставшихся элементов
+        // Restore the heap property for the remaining elements
         sift_down(first, static_cast<std::ptrdiff_t>(last - first - 1), static_cast<std::ptrdiff_t>(0), comp);
     }
 
@@ -105,7 +105,7 @@ namespace mystl
         if (len < 2) 
             return;
 
-        // Начинаем с последнего узла, у которого есть потомки, и идем к корню (O(N))
+        // Start from the last node that has children and move toward the root (O(N))
         for (Distance i = (len - 2) / 2; i >= 0; --i) 
         {
             sift_down(first, len, i, comp);

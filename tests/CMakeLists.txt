@@ -53,3 +53,7 @@ gtest_discover_tests(test_unordered_set)
 add_executable(test_unordered_multiset test_unordered_multiset.cpp)
 target_link_libraries(test_unordered_multiset PRIVATE mystl GTest::gtest_main)
 gtest_discover_tests(test_unordered_multiset)
+
+add_executable(test_unordered_multimap test_unordered_multimap.cpp)
+target_link_libraries(test_unordered_multimap PRIVATE mystl GTest::gtest_main)
+gtest_discover_tests(test_unordered_multimap)

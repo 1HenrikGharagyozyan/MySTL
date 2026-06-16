@@ -8,7 +8,7 @@ TEST(UnorderedMultiSetTest, MultipleInsertions)
 {
     UnorderedMultiSet<int> mset;
     
-    // Вставка всегда успешна, возвращается только итератор
+    // Insertion always succeeds and returns only an iterator
     mset.insert(42);
     mset.insert(42);
     mset.insert(42);
@@ -46,7 +46,7 @@ TEST(UnorderedMultiSetTest, EraseAllMatches)
     mset.insert(10);
     mset.insert(20);
 
-    // Должно удалиться ровно два элемента со значением 10
+    // Exactly two elements with value 10 should be removed
     size_t erased = mset.erase(10);
     
     EXPECT_EQ(erased, 2);

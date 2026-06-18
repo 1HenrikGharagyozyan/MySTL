@@ -20,7 +20,7 @@ namespace mystl
         using const_reference = typename Container::const_reference;
         using allocator_type  = typename Container::allocator_type;
 
-        static_assert(std::is_same<T, value_type>::value,
+        static_assert(mystl::is_same<T, value_type>::value,
                       "Stack<T, Container>: Container::value_type must be T");
 
     protected:

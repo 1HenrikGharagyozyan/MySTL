@@ -55,6 +55,19 @@ namespace mystl
     template <typename T> 
     using decay_t = typename decay<T>::type;
 
+    template <typename T> struct add_const { using type = const T; };
+    template <typename T> using add_const_t = typename add_const<T>::type;
+
+    template <typename T> struct add_volatile { using type = volatile T; };
+    template <typename T> using add_volatile_t = typename add_volatile<T>::type;
+
+    template <typename T> struct add_cv { using type = typename add_volatile<typename add_const<T>::type>::type; };
+    template <typename T> using add_cv_t = typename add_cv<T>::type;
+
+    template <typename T> struct add_pointer { using type = T*; };
+    template <typename T> using add_pointer_t = typename add_pointer<T>::type;
+
+
     // ========================================================================
     // 3. FUNDAMENTAL TYPE TRAITS (SFINAE)
     // ========================================================================
@@ -65,11 +78,58 @@ namespace mystl
     template <typename T, typename U>
     inline constexpr bool is_same_v = is_same<T, U>::value;
 
+    template<typename T> struct is_const { static constexpr bool value = false; };
+    template<typename T> struct is_const<const T> { static constexpr bool value = true; };
+
+    template<typename T>
+    inline constexpr bool is_const_v = is_const<T>::value;
+
+    template<typename T> struct is_volatile { static constexpr bool value = false; };
+    template<typename T> struct is_volatile<volatile T> { static constexpr bool value = true; };
+
+    template<typename T>
+    inline constexpr bool is_volatile_v = is_volatile<T>::value;
+
+    template <typename T> struct is_pointer { static constexpr bool value = false; };
+    template <typename T> struct is_pointer<T*> { static constexpr bool value = true; };
+    template <typename T> struct is_pointer<T* const> { static constexpr bool value = true; };
+    template <typename T> struct is_pointer<T* volatile> { static constexpr bool value = true; };
+    template <typename T> struct is_pointer<T* const volatile> { static constexpr bool value = true; };
+
     template <bool B, typename T = void> struct enable_if {};
     template <typename T> struct enable_if<true, T> { using type = T; };
 
     template <bool B, typename T = void>
     using enable_if_t = typename enable_if<B, T>::type;
+
+    template <typename T> struct is_integral { static constexpr bool value = false; };
+    template <> struct is_integral<bool> { static constexpr bool value = true; };
+    template <> struct is_integral<char> { static constexpr bool value = true; };
+    template <> struct is_integral<signed char> { static constexpr bool value = true; };
+    template <> struct is_integral<unsigned char> { static constexpr bool value = true; };
+    template <> struct is_integral<short> { static constexpr bool value = true; };
+    template <> struct is_integral<unsigned short> { static constexpr bool value = true; };
+    template <> struct is_integral<int> { static constexpr bool value = true; };
+    template <> struct is_integral<unsigned int> { static constexpr bool value = true; };
+    template <> struct is_integral<long> { static constexpr bool value = true; };
+    template <> struct is_integral<unsigned long> { static constexpr bool value = true; };
+    template <> struct is_integral<long long> { static constexpr bool value = true; };
+    template <> struct is_integral<unsigned long long> { static constexpr bool value = true; };
+
+    template <typename T> struct is_lvalue_reference { static constexpr bool value = false; };
+    template <typename T> struct is_lvalue_reference<T&> { static constexpr bool value = true; };
+
+    template <typename T>
+    inline constexpr bool is_lvalue_reference_v = is_lvalue_reference<T>::value;
+
+    // ========================================================================
+    // Conditional
+    // ========================================================================
+    template <bool B, typename T, typename F> struct conditional { using type = T; };
+    template <typename T, typename F> struct conditional<false, T, F> { using type = F; };
+
+    template <bool B, typename T, typename F>
+    using conditional_t = typename conditional<B, T, F>::type;
 
     // ========================================================================
     // 4. MOVE SEMANTICS & PERFECT FORWARDING
@@ -90,6 +150,10 @@ namespace mystl
     template <typename T>
     constexpr T&& forward(remove_reference_t<T>&& arg) noexcept
     {
+        static_assert(
+            !is_lvalue_reference<T>::value,
+            "mystl::forward: T must not be an lvalue reference"
+        );
         return static_cast<T&&>(arg);
     }
 
@@ -99,6 +163,19 @@ namespace mystl
         T temp = mystl::move(a);
         a = mystl::move(b);
         b = mystl::move(temp);
+    }
+
+
+    // ========================================================================
+    // Exchange two values
+    // ========================================================================
+
+    template <typename T, typename U = T>
+    constexpr T exchange(T& obj, U&& new_value) noexcept
+    {
+        T old_value = mystl::move(obj);
+        obj = mystl::forward<U>(new_value);
+        return old_value;
     }
 
     // ========================================================================
@@ -128,16 +205,12 @@ namespace mystl
         Pair& operator=(Pair&&) noexcept = default;
         ~Pair() = default;                          
 
-        void swap(Pair& other) noexcept
+        constexpr void swap(Pair& other) noexcept
         {
-            T1 temp1 = mystl::move(first);
-            first = mystl::move(other.first);
-            other.first = mystl::move(temp1);
-
-            T2 temp2 = mystl::move(second);
-            second = mystl::move(other.second);
-            other.second = mystl::move(temp2);
+            mystl::swap(first, other.first);
+            mystl::swap(second, other.second);
         }
+
     };
 
     // make_pair now uses decay_t

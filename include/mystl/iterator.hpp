@@ -16,6 +16,26 @@ namespace mystl
     struct random_access_iterator_tag : bidirectional_iterator_tag {};
 
     // ========================================================================
+    // BASE ITERATOR CLASS
+    // ========================================================================
+
+    template<
+        typename Category,
+        typename T,
+        typename Distance = std::ptrdiff_t,
+        typename Pointer = T*,
+        typename Reference = T&
+    >
+    struct iterator
+    {
+        using iterator_category = Category;
+        using value_type        = T;
+        using difference_type   = Distance;
+        using pointer           = Pointer;
+        using reference         = Reference;
+    };
+
+    // ========================================================================
     // ITERATOR TRAITS
     // ========================================================================
 
@@ -50,40 +70,96 @@ namespace mystl
     };
 
     // ========================================================================
-    // DISTANCE
+    // DETAIL IMPLEMENTATIONS (TAG DISPATCHING)
     // ========================================================================
-
-    template <typename InputIterator>
-    typename iterator_traits<InputIterator>::difference_type
-    distance(InputIterator first, InputIterator last)
+    
+    namespace detail
     {
-        typename iterator_traits<InputIterator>::difference_type n = 0;
-
-        while (first != last)
+        // --- DISTANCE IMPL ---
+        template<typename Iterator>
+        typename iterator_traits<Iterator>::difference_type
+        distance_impl(Iterator first, Iterator last, input_iterator_tag)
         {
-            ++first;
-            ++n;
+            typename iterator_traits<Iterator>::difference_type n = 0;
+            while (first != last)
+            {
+                ++first;
+                ++n;
+            }
+            return n;
         }
 
-        return n;
+        template<typename Iterator>
+        typename iterator_traits<Iterator>::difference_type
+        distance_impl(Iterator first, Iterator last, random_access_iterator_tag)
+        {
+            return last - first;
+        }
+
+        // --- ADVANCE IMPL ---
+        template<typename Iterator, typename Distance>
+        void advance_impl(Iterator& it, Distance n, input_iterator_tag)
+        {
+            while (n > 0)
+            {
+                ++it;
+                --n;
+            }
+        }
+
+        template<typename Iterator, typename Distance>
+        void advance_impl(Iterator& it, Distance n, bidirectional_iterator_tag)
+        {
+            if (n >= 0)
+            {
+                while (n--)
+                {
+                    ++it;
+                }
+            }
+            else
+            {
+                while (n++)
+                {
+                    --it;
+                }
+            }
+        }
+
+        template<typename Iterator, typename Distance>
+        void advance_impl(Iterator& it, Distance n, random_access_iterator_tag)
+        {
+            it += n;
+        }
+    } // namespace detail
+
+    // ========================================================================
+    // PUBLIC INTERFACE: DISTANCE & ADVANCE
+    // ========================================================================
+
+    template<typename Iterator>
+    typename iterator_traits<Iterator>::difference_type
+    distance(Iterator first, Iterator last)
+    {
+        return detail::distance_impl(
+            first,
+            last,
+            typename iterator_traits<Iterator>::iterator_category{}
+        );
+    }
+
+    template<typename Iterator, typename Distance>
+    void advance(Iterator& it, Distance n)
+    {
+        detail::advance_impl(
+            it,
+            n,
+            typename iterator_traits<Iterator>::iterator_category{}
+        );
     }
 
     // ========================================================================
-    // ADVANCE
-    // ========================================================================
-
-    template <typename InputIterator, typename Distance>
-    void advance(InputIterator& it, Distance n)
-    {
-        while (n > 0)
-        {
-            ++it;
-            --n;
-        }
-    }
-
-    // ========================================================================
-    // NEXT
+    // NEXT & PREV
     // ========================================================================
 
     template <typename Iterator>
@@ -94,16 +170,11 @@ namespace mystl
     }
 
     template <typename Iterator>
-    Iterator next(Iterator it,
-                typename iterator_traits<Iterator>::difference_type n)
+    Iterator next(Iterator it, typename iterator_traits<Iterator>::difference_type n)
     {
-        advance(it, n);
+        mystl::advance(it, n);
         return it;
     }
-
-    // ========================================================================
-    // PREV
-    // ========================================================================
 
     template <typename BidirectionalIterator>
     BidirectionalIterator prev(BidirectionalIterator it)
@@ -117,12 +188,7 @@ namespace mystl
         BidirectionalIterator it,
         typename iterator_traits<BidirectionalIterator>::difference_type n)
     {
-        while (n > 0)
-        {
-            --it;
-            --n;
-        }
-
+        mystl::advance(it, -n); // Оптимизация: используем мощь dispatching'а!
         return it;
     }
 
@@ -147,20 +213,11 @@ namespace mystl
         Iterator current_;
 
     public:
-        constexpr reverse_iterator()
-            : current_()
-        {
-        }
+        constexpr reverse_iterator() : current_() {}
 
-        explicit constexpr reverse_iterator(Iterator it)
-            : current_(it)
-        {
-        }
+        explicit constexpr reverse_iterator(Iterator it) : current_(it) {}
 
-        constexpr Iterator base() const
-        {
-            return current_;
-        }
+        constexpr Iterator base() const { return current_; }
 
         constexpr reference operator*() const
         {
@@ -169,10 +226,7 @@ namespace mystl
             return *tmp;
         }
 
-        constexpr pointer operator->() const
-        {
-            return &(operator*());
-        }
+        constexpr pointer operator->() const { return &(operator*()); }
 
         constexpr reverse_iterator& operator++()
         {
@@ -200,6 +254,42 @@ namespace mystl
             return tmp;
         }
 
+        // --- Arithmetic ---
+
+        constexpr reverse_iterator operator+(difference_type n) const
+        {
+            return reverse_iterator(current_ - n);
+        }
+
+        constexpr reverse_iterator operator-(difference_type n) const
+        {
+            return reverse_iterator(current_ + n);
+        }
+
+        constexpr reverse_iterator& operator+=(difference_type n)
+        {
+            current_ -= n;
+            return *this;
+        }
+
+        constexpr reverse_iterator& operator-=(difference_type n)
+        {
+            current_ += n;
+            return *this;
+        }
+
+        constexpr reference operator[](difference_type n) const
+        {
+            return *(*this + n);
+        }
+
+        constexpr difference_type operator-(const reverse_iterator& other) const
+        {
+            return other.current_ - current_;
+        }
+
+        // --- Comparisons ---
+
         constexpr bool operator==(const reverse_iterator& other) const
         {
             return current_ == other.current_;
@@ -209,6 +299,26 @@ namespace mystl
         {
             return current_ != other.current_;
         }
+
+        constexpr bool operator<(const reverse_iterator& other) const
+        {
+            return other.current_ < current_;
+        }
+
+        constexpr bool operator>(const reverse_iterator& other) const
+        {
+            return other < *this;
+        }
+
+        constexpr bool operator<=(const reverse_iterator& other) const
+        {
+            return !(other < *this);
+        }
+
+        constexpr bool operator>=(const reverse_iterator& other) const
+        {
+            return !(*this < other);
+        }
     };
 
-}
+} // namespace mystl

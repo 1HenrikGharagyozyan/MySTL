@@ -3,7 +3,8 @@
 #include <cstddef>
 #include <stdexcept>
 #include <initializer_list>
-#include <iterator>
+
+#include "iterator.hpp"
 #include "allocator.hpp"
 #include "utility.hpp"
 
@@ -28,7 +29,7 @@ namespace mystl
         class Iterator
         {
         public:
-            using iterator_category = std::random_access_iterator_tag;
+            using iterator_category = mystl::random_access_iterator_tag;
             using value_type = Vector::value_type;
             using difference_type = std::ptrdiff_t;
             using pointer = Vector::pointer;
@@ -96,7 +97,7 @@ namespace mystl
         class ConstIterator
         {
         public:
-            using iterator_category = std::random_access_iterator_tag;
+            using iterator_category = mystl::random_access_iterator_tag;
             using value_type = Vector::value_type;
             using difference_type = std::ptrdiff_t;
             using pointer = Vector::const_pointer;
@@ -189,7 +190,7 @@ namespace mystl
 
         using iterator = Iterator;
         using const_iterator = ConstIterator;
-        using reverse_iterator = std::reverse_iterator<iterator>;
+        using reverse_iterator = mystl::reverse_iterator<iterator>;
         using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
     private:
@@ -389,7 +390,7 @@ namespace mystl
 
         template<typename InputIt>
         Vector(InputIt first, InputIt last)
-            : size_(std::distance(first, last))
+            : size_(mystl::distance(first, last))
             , capacity_(size_ * 2)
         {
             data_ = capacity_ > 0 ? alloc_.allocate(capacity_) : nullptr;

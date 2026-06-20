@@ -15,7 +15,7 @@ TEST(MapTest, OperatorBracketAccess)
 {
     Map<std::string, int> m;
     
-    // Вставка через оператор []
+    // Insertion via operator []
     m["Health"] = 100;
     m["Mana"] = 50;
     
@@ -23,7 +23,7 @@ TEST(MapTest, OperatorBracketAccess)
     EXPECT_EQ(m["Health"], 100);
     EXPECT_EQ(m["Mana"], 50);
 
-    // Доступ к несуществующему ключу создает его с дефолтным значением (0)
+    // Accessing a non-existent key creates it with default value (0)
     EXPECT_EQ(m["Stamina"], 0);
     EXPECT_EQ(m.size(), 3);
 }
@@ -41,19 +41,19 @@ TEST(MapTest, InsertOrAssignAndTryEmplace)
 {
     Map<int, std::string> m;
     
-    // Вставка
+    // Insertion
     auto res1 = m.insert_or_assign(1, "Enemy");
     EXPECT_TRUE(res1.second);
     
-    // Перезапись
+    // Overwrite
     auto res2 = m.insert_or_assign(1, "Boss");
     EXPECT_FALSE(res2.second);
     EXPECT_EQ(m[1], "Boss");
 
-    // try_emplace (не должен перезаписывать, если ключ уже есть)
+    // try_emplace (should not overwrite if key already exists)
     auto res3 = m.try_emplace(1, "Minion");
     EXPECT_FALSE(res3.second);
-    EXPECT_EQ(m[1], "Boss"); // Значение осталось прежним
+    EXPECT_EQ(m[1], "Boss"); // Value remains unchanged
 }
 
 TEST(MapTest, FindAndContains) 
@@ -67,7 +67,7 @@ TEST(MapTest, FindAndContains)
     ASSERT_NE(it, m.end());
     EXPECT_EQ(it->second, 3.3);
     
-    // Проверка мутабельности значения через итератор
+    // Checking value mutability through iterator
     it->second = 9.9;
     EXPECT_EQ(m[3], 9.9);
 }
@@ -79,5 +79,5 @@ TEST(MapTest, Erase)
     EXPECT_EQ(m.erase("B"), 1);
     EXPECT_EQ(m.size(), 2);
     EXPECT_FALSE(m.contains("B"));
-    EXPECT_EQ(m.erase("Z"), 0); // Удаление несуществующего
+    EXPECT_EQ(m.erase("Z"), 0); // Deletion of non-existent
 }

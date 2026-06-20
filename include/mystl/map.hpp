@@ -24,7 +24,7 @@ namespace mystl
         using value_type             = mystl::Pair<const Key, T>;
         
     private:
-        // Конфигурируем RBTree: Value = Pair<const Key, T>, экстрактор = Select1st
+        // Configure RBTree: Value = Pair<const Key, T>, extractor = Select1st
         using Tree = RBTree<Key, value_type, mystl::Select1st<value_type>, Compare, Allocator>;
         Tree tree_;
 
@@ -41,7 +41,7 @@ namespace mystl
         using const_reverse_iterator = typename Tree::const_reverse_iterator;
 
         // ========================================================================
-        // КОНСТРУКТОРЫ
+        // CONSTRUCTORS
         // ========================================================================
         Map() : tree_() {}
         
@@ -75,7 +75,7 @@ namespace mystl
         }
 
         // ========================================================================
-        // RULE OF FIVE И АЛЛОКАТОРЫ
+        // RULE OF FIVE AND ALLOCATORS
         // ========================================================================
         Map(const Map& other) : tree_(other.tree_) {}
         Map(const Map& other, const Allocator& alloc) : tree_(other.tree_, alloc) {}
@@ -96,12 +96,12 @@ namespace mystl
         }
 
         // ========================================================================
-        // ДОСТУП К ЭЛЕМЕНТАМ (ACCESS)
+        // ELEMENT ACCESS
         // ========================================================================
         
         mapped_type& operator[](const key_type& key) 
         {
-            // ОПТИМИЗАЦИЯ: Сначала ищем. Если ключ есть — не делаем лишнюю аллокацию памяти!
+            // OPTIMIZATION: First search. If the key exists — don't allocate extra memory!
             iterator it = tree_.find(key);
             if (it != end()) 
                 return it->second;
@@ -127,7 +127,7 @@ namespace mystl
         }
 
         // ========================================================================
-        // СОСТОЯНИЕ КОНТЕЙНЕРА
+        // CONTAINER STATE
         // ========================================================================
         [[nodiscard]] allocator_type get_allocator() const noexcept { return tree_.get_allocator(); }
         [[nodiscard]] bool empty() const noexcept { return tree_.empty(); }
@@ -147,7 +147,7 @@ namespace mystl
         const_reverse_iterator crend() const noexcept { return tree_.crend(); }
 
         // ========================================================================
-        // МОДИФИКАТОРЫ (MODIFIERS)
+        // MODIFIERS
         // ========================================================================
         mystl::Pair<iterator, bool> insert(const value_type& value) 
         {
@@ -176,16 +176,16 @@ namespace mystl
             return tree_.emplace_unique(key, T(mystl::forward<Args>(args)...));
         }
 
-        // C++17 insert_or_assign (ИСПРАВЛЕНО И ОПТИМИЗИРОВАНО)
+        // C++17 insert_or_assign (FIXED AND OPTIMIZED)
         mystl::Pair<iterator, bool> insert_or_assign(const key_type& key, const T& obj) 
         {
             iterator it = tree_.find(key);
             if (it != end()) 
             {
-                it->second = obj; // Если ключ уже есть, безопасно перезаписываем значение
+                it->second = obj; // If the key exists, safely overwrite the value
                 return {it, false};
             }
-            return tree_.emplace_unique(key, obj); // Иначе вставляем новую ноду
+            return tree_.emplace_unique(key, obj); // Otherwise insert a new node
         }
 
         mystl::Pair<iterator, bool> insert_or_assign(const key_type& key, T&& obj) 
@@ -193,10 +193,10 @@ namespace mystl
             iterator it = tree_.find(key);
             if (it != end()) 
             {
-                it->second = mystl::move(obj); // Безопасно перемещаем только если ключ существует!
+                it->second = mystl::move(obj); // Safely move only if the key exists!
                 return {it, false};
             }
-            return tree_.emplace_unique(key, mystl::move(obj)); // Иначе отдаем перемещение внутрь дерева
+            return tree_.emplace_unique(key, mystl::move(obj)); // Otherwise pass the move operation to the tree
         }
 
         size_type erase(const key_type& key) 
@@ -210,7 +210,7 @@ namespace mystl
         }
 
         // ========================================================================
-        // ПОИСК (SEARCH)
+        // SEARCH
         // ========================================================================
         iterator find(const key_type& key) { return tree_.find(key); }
         const_iterator find(const key_type& key) const { return tree_.find(key); }
@@ -229,7 +229,7 @@ namespace mystl
 
 } // namespace mystl
 
-// Поддержка allocator traits для Map
+// Support for allocator traits for Map
 namespace std
 {
     template <typename Key, typename T, typename Compare, typename Alloc>

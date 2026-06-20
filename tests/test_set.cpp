@@ -22,10 +22,10 @@ TEST(SetTest, InsertAndUnique)
     auto res2 = s.insert(20);
     EXPECT_TRUE(res2.second);
 
-    // Пытаемся вставить дубликат
+    // Trying to insert a duplicate
     auto res3 = s.insert(10);
-    EXPECT_FALSE(res3.second); // Вставка должна отклониться
-    EXPECT_EQ(*res3.first, 10); // Итератор должен указывать на существующий элемент
+    EXPECT_FALSE(res3.second); // Insertion should be rejected
+    EXPECT_EQ(*res3.first, 10); // Iterator should point to the existing element
 
     EXPECT_EQ(s.size(), 2);
 }
@@ -34,7 +34,7 @@ TEST(SetTest, IterationIsSorted)
 {
     Set<int> s = {50, 20, 40, 10, 30};
     
-    // В красно-черном дереве элементы всегда отсортированы
+    // In a red-black tree, elements are always sorted
     int expected = 10;
     for (int val : s) 
     {
@@ -65,6 +65,6 @@ TEST(SetTest, EraseElement)
     EXPECT_EQ(s.size(), 4);
     EXPECT_FALSE(s.contains(3));
 
-    // Удаление несуществующего элемента
+    // Deletion of non-existent element
     EXPECT_EQ(s.erase(99), 0);
 }

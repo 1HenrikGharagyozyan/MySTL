@@ -188,7 +188,7 @@ namespace mystl
         BidirectionalIterator it,
         typename iterator_traits<BidirectionalIterator>::difference_type n)
     {
-        mystl::advance(it, -n); // Оптимизация: используем мощь dispatching'а!
+        mystl::advance(it, -n); // Optimization: leveraging the power of tag dispatching!
         return it;
     }
 

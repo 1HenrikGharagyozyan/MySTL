@@ -67,6 +67,54 @@ namespace mystl
     template <typename T> struct add_pointer { using type = T*; };
     template <typename T> using add_pointer_t = typename add_pointer<T>::type;
 
+    // ========================================================================
+    // INTEGRAL CONSTANTS & TAG DISPATCHING
+    // ========================================================================
+
+    template <typename T, T v>
+    struct integral_constant 
+    {
+        static constexpr T value = v;
+        using value_type = T;
+        using type = integral_constant;
+        constexpr operator value_type() const noexcept { return value; }
+        constexpr value_type operator()() const noexcept { return value; }
+    };
+
+    using true_type  = integral_constant<bool, true>;
+    using false_type = integral_constant<bool, false>;
+
+    template <bool B>
+    using bool_constant = integral_constant<bool, B>;
+
+    // ========================================================================
+    // REMOVE POINTER
+    // ========================================================================
+
+    template <typename T> struct remove_pointer { using type = T; };
+    template <typename T> struct remove_pointer<T*> { using type = T; };
+    template <typename T> struct remove_pointer<T* const> { using type = T; };
+    template <typename T> struct remove_pointer<T* volatile> { using type = T; };
+    template <typename T> struct remove_pointer<T* const volatile> { using type = T; };
+
+    template <typename T>
+    using remove_pointer_t = typename remove_pointer<T>::type;
+
+    // Алиас для remove_const_t (в твоем коде есть struct remove_const, но нет _t)
+    template <typename T>
+    using remove_const_t = typename remove_const<T>::type;
+
+    // ========================================================================
+    // COMPILER INTRINSICS (Для безопасного memmove)
+    // ========================================================================
+    
+    // Используем встроенные функции компилятора (GCC/Clang/MSVC) для проверки тривиальности
+    template <typename T>
+    inline constexpr bool is_trivially_copy_assignable_v = __is_trivially_assignable(T&, const T&);
+
+    template <typename T>
+    inline constexpr bool is_trivially_move_assignable_v = __is_trivially_assignable(T&, T&&);
+
 
     // ========================================================================
     // 3. FUNDAMENTAL TYPE TRAITS (SFINAE)

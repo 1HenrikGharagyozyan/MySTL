@@ -14,9 +14,9 @@ add_executable(test_string test_string.cpp)
 target_link_libraries(test_string PRIVATE mystl GTest::gtest_main)
 gtest_discover_tests(test_string)
 
-# add_executable(test_list test_list.cpp)
-# target_link_libraries(test_list PRIVATE mystl GTest::gtest_main)
-# gtest_discover_tests(test_list)
+add_executable(test_list test_list.cpp)
+target_link_libraries(test_list PRIVATE mystl GTest::gtest_main)
+gtest_discover_tests(test_list)
 
 # add_executable(test_forward_list test_forward_list.cpp)
 # target_link_libraries(test_forward_list PRIVATE mystl GTest::gtest_main)

@@ -11,12 +11,6 @@ namespace mystl
 {
 
     // ========================================================================
-    // TYPE TRAITS FOR MEMORY (Using compiler intrinsics directly for simplicity)
-    // ========================================================================
-    template <typename T>
-    inline constexpr bool is_trivially_destructible_v = __has_trivial_destructor(T);
-
-    // ========================================================================
     // ADDRESSOF & LIFECYCLE MANAGEMENT
     // ========================================================================
     

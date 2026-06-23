@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <vector>
 #include <string>
+
+#include "mystl/functional.hpp"
 #include "mystl/algorithm.hpp"
 
 using namespace mystl;
@@ -88,16 +90,16 @@ TEST(AlgorithmTest, HeapOperations)
     std::vector<int> v = {3, 1, 4, 1, 5, 9};
 
     // make_heap
-    mystl::make_heap(v.begin(), v.end(), mystl::less<int>());
+    mystl::make_heap(v.begin(), v.end(), mystl::less{});
     EXPECT_EQ(v.front(), 9); // Max-heap: 9 should be at the top
 
     // pop_heap
-    mystl::pop_heap(v.begin(), v.end(), mystl::less<int>());
+    mystl::pop_heap(v.begin(), v.end(), mystl::less{});
     v.pop_back(); // Remove 9 from the end of the vector
     EXPECT_EQ(v.front(), 5); // Now 5 is at the top
 
     // push_heap
     v.push_back(10);
-    mystl::push_heap(v.begin(), v.end(), mystl::less<int>());
+    mystl::push_heap(v.begin(), v.end(), mystl::less{});
     EXPECT_EQ(v.front(), 10); // 10 becomes the new top
 }

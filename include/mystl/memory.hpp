@@ -15,11 +15,19 @@ namespace mystl
     // ========================================================================
     
     // Safe getting of object address (bypasses overloaded operator&)
+    // ========================================================================
+    // ADDRESSOF & LIFECYCLE MANAGEMENT
+    // ========================================================================
+
+    // Безопасное получение адреса объекта (обходит перегруженный operator&)
     template <typename T>
     constexpr T* addressof(T& arg) noexcept 
     {
         return __builtin_addressof(arg);
     }
+
+    template <typename T>
+    const T* addressof(const T&&) = delete;
 
     template <typename T, typename... Args>
     constexpr T* construct_at(T* p, Args&&... args) 
@@ -45,11 +53,12 @@ namespace mystl
         }
     }
 
-    //
+    // ========================================================================
+    // UNINITIALIZED MEMORY ALGORITHMS
+    // ========================================================================
     namespace detail 
     {
-        // RAII Guard: If an exception is thrown during array object construction,
-        // this guard will automatically delete already created objects, preventing a leak.
+        // RAII Guard: Если при конструировании вылетит исключение, удалит уже созданное
         template <typename T>
         struct destroy_guard 
         {
@@ -66,13 +75,11 @@ namespace mystl
             
             constexpr void release() noexcept 
             {
-                first = current; // Cancel deletion (everything succeeded)
+                first = current; // Отмена удаления (всё прошло успешно)
             }
         };
-
     }
 
-    //
     template <typename ForwardIt, typename T>
     void uninitialized_fill(ForwardIt first, ForwardIt last, const T& value) 
     {
@@ -117,8 +124,34 @@ namespace mystl
         return d_first;
     }
 
-    //
-    // A layer that standardizes work with any allocators
+    namespace detail 
+    {
+        template <typename... Ts> using void_t = void;
+
+        // Фоллбэк: если rebind не найден, вытаскиваем шаблонные аргументы и меняем первый
+        template <typename Alloc, typename U>
+        struct rebind_fallback;
+
+        template <template <typename, typename...> class AllocTemplate, typename T, typename... Args, typename U>
+        struct rebind_fallback<AllocTemplate<T, Args...>, U>
+        {
+            using type = AllocTemplate<U, Args...>;
+        };
+
+        template <typename Alloc, typename U, typename = void>
+        struct rebind_alloc_helper : rebind_fallback<Alloc, U> {};
+
+        // Магия SFINAE: если Alloc::rebind<U>::other существует, будет выбрана эта специализация
+        template <typename Alloc, typename U>
+        struct rebind_alloc_helper<Alloc, U, void_t<typename Alloc::template rebind<U>::other>> 
+        {
+            using type = typename Alloc::template rebind<U>::other;
+        };
+    }
+
+    // ========================================================================
+    // ALLOCATOR TRAITS
+    // ========================================================================
     template <typename Alloc>
     struct allocator_traits 
     {
@@ -127,9 +160,8 @@ namespace mystl
         using pointer        = value_type*;
         using size_type      = std::size_t;
 
-        // Allows containers to "rebind" the allocator for memory allocation for nodes (e.g., for tree nodes)
         template <typename T>
-        using rebind_alloc = typename Alloc::template rebind<T>::other;
+        using rebind_alloc = typename detail::rebind_alloc_helper<Alloc, T>::type;
 
         template <typename T>
         using rebind_traits = allocator_traits<rebind_alloc<T>>;
@@ -144,7 +176,6 @@ namespace mystl
             a.deallocate(p, n);
         }
 
-        // We handle construction ourselves (allocator now only allocates memory)
         template <typename T, typename... Args>
         static void construct(Alloc&, T* p, Args&&... args) 
         {
@@ -159,7 +190,7 @@ namespace mystl
 
         static Alloc select_on_container_copy_construction(const Alloc& rhs) 
         {
-            return rhs; // In a simple implementation, allocators are simply copied
+            return rhs; 
         }
     };
 

@@ -110,8 +110,9 @@ namespace mystl
         mutable NodeBase sentinel_;
         std::size_t size_ = 0;
         
-        using node_allocator_type = typename Allocator::template rebind<Node>::other;
-        using node_traits         = mystl::allocator_traits<node_allocator_type>;
+        using allocator_traits_type = mystl::allocator_traits<Allocator>;
+        using node_allocator_type   = typename allocator_traits_type::template rebind_alloc<Node>;
+        using node_traits           = mystl::allocator_traits<node_allocator_type>;
         
         [[no_unique_address]] node_allocator_type alloc_;
 

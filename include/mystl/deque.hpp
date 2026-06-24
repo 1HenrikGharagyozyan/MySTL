@@ -1,26 +1,29 @@
 #pragma once
 
-#include <cstddef>
-#include <iterator>
-#include <memory>
-#include <stdexcept>
-#include <cassert>
-
-#include "allocator.hpp"
 #include "utility.hpp"
+#include "iterator.hpp"
+#include "memory.hpp"
+#include "allocator.hpp"
+#include "algorithm.hpp"
+
+#include <cstddef>
+#include <initializer_list>
 
 namespace mystl 
 {
-
+    // Define the deque block buffer size in bytes (minimum 512 bytes or 1 element)
     inline constexpr std::size_t deque_buf_size(std::size_t size) 
     {
         return size < 512 ? std::size_t(512 / size) : std::size_t(1);
     }
 
+    // ========================================================================
+    // BIDIRECTIONAL DEQUE ITERATOR
+    // ========================================================================
     template <typename T, typename Reference, typename Pointer>
     struct DequeIterator 
     {
-        using iterator_category = std::random_access_iterator_tag;
+        using iterator_category = mystl::random_access_iterator_tag;
         using value_type        = T;
         using pointer           = Pointer;
         using reference         = Reference;
@@ -29,11 +32,11 @@ namespace mystl
         using map_pointer = T**;
         using Self        = DequeIterator;
 
-        // Key optimization: 4 pointers for O(1) iteration without division
-        T* cur;       // Points to the current element
-        T* first;     // Points to the beginning of the current block
-        T* last;      // Points to the end of the current block (exclusive)
-        map_pointer node; // Points to the block map itself
+        // Store four pointers for O(1) iteration without division
+        T* cur;           // Pointer to the current element
+        T* first;         // Pointer to the beginning of the current block
+        T* last;          // Pointer to the end of the current block (exclusive)
+        map_pointer node; // Pointer to the block-map entry
 
         static constexpr std::size_t buffer_size() 
         {
@@ -67,7 +70,7 @@ namespace mystl
         Self& operator++() noexcept 
         {
             ++cur;
-            if (cur == last) // Reached the end of the block, jump to the next one
+            if (cur == last) 
             { 
                 set_node(node + 1);
                 cur = first;
@@ -84,7 +87,7 @@ namespace mystl
 
         Self& operator--() noexcept 
         {
-            if (cur == first) // Reached the beginning of the block, jump to the previous one
+            if (cur == first) 
             { 
                 set_node(node - 1);
                 cur = last;
@@ -105,12 +108,10 @@ namespace mystl
             difference_type offset = n + (cur - first);
             if (offset >= 0 && offset < static_cast<difference_type>(buffer_size())) 
             {
-                // Stay in the same block
                 cur += n;
             } 
             else 
             {
-                // Jump across blocks
                 difference_type node_offset = offset > 0 
                     ? offset / static_cast<difference_type>(buffer_size())
                     : -static_cast<difference_type>((-offset - 1) / buffer_size()) - 1;
@@ -141,15 +142,18 @@ namespace mystl
         bool operator>=(const Self& x) const noexcept { return !(*this < x); }
     };
 
+    // ========================================================================
+    // DOUBLE-ENDED QUEUE (DEQUE)
+    // ========================================================================
     template <typename T, typename Allocator = mystl::Allocator<T>>
     class Deque 
     {
     public:
         using value_type             = T;
         using allocator_type         = Allocator;
-        using allocator_traits_type  = std::allocator_traits<Allocator>;
+        using allocator_traits_type  = mystl::allocator_traits<Allocator>;
         using size_type              = typename allocator_traits_type::size_type;
-        using difference_type        = typename allocator_traits_type::difference_type;
+        using difference_type        = std::ptrdiff_t;
         using reference              = T&;
         using const_reference        = const T&;
         using pointer                = T*;
@@ -157,25 +161,26 @@ namespace mystl
         
         using iterator               = DequeIterator<T, T&, T*>;
         using const_iterator         = DequeIterator<T, const T&, const T*>;
-        using reverse_iterator       = std::reverse_iterator<iterator>;
-        using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+        using reverse_iterator       = mystl::reverse_iterator<iterator>;
+        using const_reverse_iterator = mystl::reverse_iterator<const_iterator>;
 
     private:
         using map_pointer = T**;
-        using map_allocator_type = typename std::allocator_traits<Allocator>::template rebind_alloc<T*>;
+        using map_allocator_type = allocator_traits_type::template rebind_alloc<T*>;
+        using map_traits = mystl::allocator_traits<map_allocator_type>;
 
         iterator    start_;       // Iterator to the first element
-        iterator    finish_;      // Iterator to the element after the last one
+        iterator    finish_;      // Iterator to the element after the last
         map_pointer map_ = nullptr;
         size_type   map_size_ = 0;
         
-        [[no_unique_address]] Allocator alloc_; // Empty allocator optimization (C++20)
+        [[no_unique_address]] Allocator alloc_; // Empty allocator optimization
 
         static constexpr size_type buffer_size() { return deque_buf_size(sizeof(T)); }
 
     public:
         // ========================================================================
-        // LIFE CYCLE (Constructors / Destructor)
+        // LIFETIME (CONSTRUCTORS / DESTRUCTOR)
         // ========================================================================
         
         Deque() { initialize_map(0); }
@@ -223,7 +228,7 @@ namespace mystl
         }
 
         Deque(const Deque& other) 
-            : alloc_(std::allocator_traits<Allocator>::select_on_container_copy_construction(other.alloc_)) 
+            : alloc_(allocator_traits_type::select_on_container_copy_construction(other.alloc_)) 
         {
             initialize_map(0);
             try
@@ -333,7 +338,7 @@ namespace mystl
             {
                 if (size() >= other.size()) 
                 {
-                    iterator it = std::copy(other.begin(), other.end(), start_);
+                    iterator it = mystl::copy(other.begin(), other.end(), start_);
                     while (finish_ != it) 
                     {
                         pop_back();
@@ -341,7 +346,7 @@ namespace mystl
                 } 
                 else 
                 {
-                    std::copy(other.begin(), other.begin() + size(), start_);
+                    mystl::copy(other.begin(), other.begin() + size(), start_);
                     for (size_type i = size(); i < other.size(); ++i) 
                     {
                         push_back(other[i]);
@@ -380,6 +385,11 @@ namespace mystl
         [[nodiscard]] const_iterator cbegin() const noexcept { return start_; }
         [[nodiscard]] const_iterator cend() const noexcept { return finish_; }
 
+        reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
+        reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
+        const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(cend()); }
+        const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
+
         [[nodiscard]] reference operator[](size_type index) noexcept { return start_[static_cast<difference_type>(index)]; }
         [[nodiscard]] const_reference operator[](size_type index) const noexcept { return start_[static_cast<difference_type>(index)]; }
 
@@ -397,24 +407,24 @@ namespace mystl
             return (*this)[index];
         }
 
-        [[nodiscard]] reference front() noexcept { assert(!empty()); return *start_; }
-        [[nodiscard]] const_reference front() const noexcept { assert(!empty()); return *start_; }
-        [[nodiscard]] reference back() noexcept { assert(!empty()); iterator tmp = finish_; --tmp; return *tmp; }
-        [[nodiscard]] const_reference back() const noexcept { assert(!empty()); const_iterator tmp = finish_; --tmp; return *tmp; }
+        [[nodiscard]] reference front() noexcept { return *start_; }
+        [[nodiscard]] const_reference front() const noexcept { return *start_; }
+        [[nodiscard]] reference back() noexcept { iterator tmp = finish_; --tmp; return *tmp; }
+        [[nodiscard]] const_reference back() const noexcept { const_iterator tmp = finish_; --tmp; return *tmp; }
 
         [[nodiscard]] size_type size() const noexcept { return map_ == nullptr ? 0 : finish_ - start_; }
         [[nodiscard]] bool empty() const noexcept { return map_ == nullptr || finish_ == start_; }
         [[nodiscard]] allocator_type get_allocator() const noexcept { return alloc_; }
 
         // ========================================================================
-        // MODIFIERS (Push / Pop / Emplace)
+        // MODIFIERS
         // ========================================================================
         
         void push_back(const T& value) 
         {
             if (finish_.cur != finish_.last - 1) 
             {
-                std::allocator_traits<Allocator>::construct(alloc_, finish_.cur, value);
+                allocator_traits_type::construct(alloc_, finish_.cur, value);
                 ++finish_;
             } 
             else 
@@ -428,7 +438,7 @@ namespace mystl
             if (start_.cur != start_.first) 
             {
                 --start_;
-                std::allocator_traits<Allocator>::construct(alloc_, start_.cur, value);
+                allocator_traits_type::construct(alloc_, start_.cur, value);
             } 
             else 
             {
@@ -441,7 +451,7 @@ namespace mystl
         {
             if (finish_.cur != finish_.last - 1) 
             {
-                std::allocator_traits<Allocator>::construct(alloc_, finish_.cur, mystl::forward<Args>(args)...);
+                allocator_traits_type::construct(alloc_, finish_.cur, mystl::forward<Args>(args)...);
                 reference ref = *finish_.cur;
                 ++finish_;
                 return ref;
@@ -455,7 +465,7 @@ namespace mystl
             if (start_.cur != start_.first) 
             {
                 --start_;
-                std::allocator_traits<Allocator>::construct(alloc_, start_.cur, mystl::forward<Args>(args)...);
+                allocator_traits_type::construct(alloc_, start_.cur, mystl::forward<Args>(args)...);
                 return *start_.cur;
             }
             return *push_front_aux(mystl::forward<Args>(args)...);
@@ -463,24 +473,22 @@ namespace mystl
 
         void pop_back() noexcept 
         {
-            assert(!empty());
             if (finish_.cur != finish_.first) 
             {
                 --finish_;
-                std::allocator_traits<Allocator>::destroy(alloc_, finish_.cur);
+                allocator_traits_type::destroy(alloc_, finish_.cur);
             } 
             else 
             {
                 --finish_;
-                std::allocator_traits<Allocator>::destroy(alloc_, finish_.cur);
+                allocator_traits_type::destroy(alloc_, finish_.cur);
                 deallocate_block(*(finish_.node + 1)); 
             }
         }
 
         void pop_front() noexcept 
         {
-            assert(!empty());
-            std::allocator_traits<Allocator>::destroy(alloc_, start_.cur);
+            allocator_traits_type::destroy(alloc_, start_.cur);
             if (start_.cur != start_.last - 1) 
             {
                 ++start_;
@@ -498,38 +506,38 @@ namespace mystl
             {
                 for (T* p = *node; p < *node + buffer_size(); ++p) 
                 {
-                    std::allocator_traits<Allocator>::destroy(alloc_, p);
+                    allocator_traits_type::destroy(alloc_, p);
                 }
                 deallocate_block(*node);
             }
             
             if (start_.node != finish_.node) 
             {
-                for (T* p = start_.cur; p < start_.last; ++p) std::allocator_traits<Allocator>::destroy(alloc_, p);
-                for (T* p = finish_.first; p < finish_.cur; ++p) std::allocator_traits<Allocator>::destroy(alloc_, p);
+                for (T* p = start_.cur; p < start_.last; ++p) allocator_traits_type::destroy(alloc_, p);
+                for (T* p = finish_.first; p < finish_.cur; ++p) allocator_traits_type::destroy(alloc_, p);
                 deallocate_block(*finish_.node);
             } 
             else 
             {
-                for (T* p = start_.cur; p < finish_.cur; ++p) std::allocator_traits<Allocator>::destroy(alloc_, p);
+                for (T* p = start_.cur; p < finish_.cur; ++p) allocator_traits_type::destroy(alloc_, p);
             }
             finish_ = start_;
         }
 
     private:
         // ========================================================================
-        // MEMORY MANAGEMENT HELPERS
+        // AUXILIARY MEMORY MANAGEMENT METHODS
         // ========================================================================
         
         void initialize_map(size_type num_elements) 
         {
             size_type num_nodes = num_elements / buffer_size() + 1;
-            map_size_ = std::max(size_type(8), num_nodes + 2);
+            map_size_ = mystl::max(size_type(8), num_nodes + 2);
             
             map_allocator_type map_alloc(alloc_);
-            map_ = std::allocator_traits<map_allocator_type>::allocate(map_alloc, map_size_);
+            map_ = map_traits::allocate(map_alloc, map_size_);
             
-            // Place the working range of blocks strictly in the center of the map
+            // Place the working block range strictly in the center of the map
             map_pointer nstart = map_ + (map_size_ - num_nodes) / 2;
             map_pointer nfinish = nstart + num_nodes - 1;
             
@@ -539,7 +547,7 @@ namespace mystl
             } 
             catch (...) 
             {
-                std::allocator_traits<map_allocator_type>::deallocate(map_alloc, map_, map_size_);
+                map_traits::deallocate(map_alloc, map_, map_size_);
                 map_ = nullptr;
                 map_size_ = 0;
                 throw;
@@ -558,14 +566,14 @@ namespace mystl
             {
                 for (cur = nstart; cur <= nfinish; ++cur) 
                 {
-                    *cur = std::allocator_traits<Allocator>::allocate(alloc_, buffer_size());
+                    *cur = allocator_traits_type::allocate(alloc_, buffer_size());
                 }
             } 
             catch (...) 
             {
                 for (map_pointer rollback = nstart; rollback < cur; ++rollback) 
                 {
-                    std::allocator_traits<Allocator>::deallocate(alloc_, *rollback, buffer_size());
+                    allocator_traits_type::deallocate(alloc_, *rollback, buffer_size());
                 }
                 throw;
             }
@@ -575,18 +583,8 @@ namespace mystl
         {
             if (block_ptr) 
             {
-                std::allocator_traits<Allocator>::deallocate(alloc_, block_ptr, buffer_size());
+                allocator_traits_type::deallocate(alloc_, block_ptr, buffer_size());
             }
-        }
-
-        void destroy_map() noexcept 
-        {
-            if (!map_) 
-                return;
-            map_allocator_type map_alloc(alloc_);
-            std::allocator_traits<map_allocator_type>::deallocate(map_alloc, map_, map_size_);
-            map_ = nullptr;
-            map_size_ = 0;
         }
 
         void release_storage() noexcept
@@ -597,7 +595,7 @@ namespace mystl
             clear();
             deallocate_block(*start_.node);
             map_allocator_type map_alloc(alloc_);
-            std::allocator_traits<map_allocator_type>::deallocate(map_alloc, map_, map_size_);
+            map_traits::deallocate(map_alloc, map_, map_size_);
 
             map_ = nullptr;
             map_size_ = 0;
@@ -609,10 +607,10 @@ namespace mystl
         iterator push_back_aux(Args&&... args) 
         {
             reserve_map_at_back();
-            *(finish_.node + 1) = std::allocator_traits<Allocator>::allocate(alloc_, buffer_size());
+            *(finish_.node + 1) = allocator_traits_type::allocate(alloc_, buffer_size());
             try 
             {
-                std::allocator_traits<Allocator>::construct(alloc_, finish_.cur, mystl::forward<Args>(args)...);
+                allocator_traits_type::construct(alloc_, finish_.cur, mystl::forward<Args>(args)...);
                 finish_.set_node(finish_.node + 1);
                 finish_.cur = finish_.first;
                 return finish_ - 1;
@@ -628,12 +626,12 @@ namespace mystl
         iterator push_front_aux(Args&&... args) 
         {
             reserve_map_at_front();
-            *(start_.node - 1) = std::allocator_traits<Allocator>::allocate(alloc_, buffer_size());
+            *(start_.node - 1) = allocator_traits_type::allocate(alloc_, buffer_size());
             try 
             {
                 start_.set_node(start_.node - 1);
                 start_.cur = start_.last - 1;
-                std::allocator_traits<Allocator>::construct(alloc_, start_.cur, mystl::forward<Args>(args)...);
+                allocator_traits_type::construct(alloc_, start_.cur, mystl::forward<Args>(args)...);
                 return start_;
             } 
             catch (...) 
@@ -665,15 +663,15 @@ namespace mystl
             size_type old_nodes = finish_.node - start_.node + 1;
             size_type new_nodes = old_nodes + nodes_to_add;
             
-            size_type new_map_size = map_size_ + std::max(map_size_, nodes_to_add) + 2;
+            size_type new_map_size = map_size_ + mystl::max(map_size_, nodes_to_add) + 2;
             map_allocator_type map_alloc(alloc_);
-            map_pointer new_map = std::allocator_traits<map_allocator_type>::allocate(map_alloc, new_map_size);
+            map_pointer new_map = map_traits::allocate(map_alloc, new_map_size);
             
             map_pointer new_start = new_map + (new_map_size - new_nodes) / 2 + (add_at_front ? nodes_to_add : 0);
             
-            std::copy(start_.node, finish_.node + 1, new_start);
+            mystl::copy(start_.node, finish_.node + 1, new_start);
             
-            std::allocator_traits<map_allocator_type>::deallocate(map_alloc, map_, map_size_);
+            map_traits::deallocate(map_alloc, map_, map_size_);
             
             map_ = new_map;
             map_size_ = new_map_size;
@@ -682,5 +680,50 @@ namespace mystl
             finish_.set_node(new_start + old_nodes - 1);
         }
     };
+
+    // ========================================================================
+    // GLOBAL COMPARISON OPERATORS
+    // ========================================================================
+    template <typename T, typename Alloc>
+    bool operator==(const Deque<T, Alloc>& lhs, const Deque<T, Alloc>& rhs) 
+    {
+        return lhs.size() == rhs.size() && mystl::equal(lhs.begin(), lhs.end(), rhs.begin());
+    }
+
+    template <typename T, typename Alloc>
+    bool operator!=(const Deque<T, Alloc>& lhs, const Deque<T, Alloc>& rhs) 
+    {
+        return !(lhs == rhs);
+    }
+
+    template <typename T, typename Alloc>
+    bool operator<(const Deque<T, Alloc>& lhs, const Deque<T, Alloc>& rhs) 
+    {
+        return mystl::lexicographical_compare(lhs.begin(), lhs.end(), rhs.begin(), rhs.end());
+    }
+
+    template <typename T, typename Alloc>
+    bool operator>(const Deque<T, Alloc>& lhs, const Deque<T, Alloc>& rhs) 
+    {
+        return rhs < lhs;
+    }
+
+    template <typename T, typename Alloc>
+    bool operator<=(const Deque<T, Alloc>& lhs, const Deque<T, Alloc>& rhs) 
+    {
+        return !(rhs < lhs);
+    }
+
+    template <typename T, typename Alloc>
+    bool operator>=(const Deque<T, Alloc>& lhs, const Deque<T, Alloc>& rhs) 
+    {
+        return !(lhs < rhs);
+    }
+
+    template <typename T, typename Alloc>
+    void swap(Deque<T, Alloc>& lhs, Deque<T, Alloc>& rhs) noexcept 
+    {
+        lhs.swap(rhs);
+    }
 
 } // namespace mystl

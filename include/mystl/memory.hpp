@@ -19,7 +19,7 @@ namespace mystl
     // ADDRESSOF & LIFECYCLE MANAGEMENT
     // ========================================================================
 
-    // Безопасное получение адреса объекта (обходит перегруженный operator&)
+    // Safely obtain an object's address (bypasses an overloaded operator&)
     template <typename T>
     constexpr T* addressof(T& arg) noexcept 
     {
@@ -58,7 +58,7 @@ namespace mystl
     // ========================================================================
     namespace detail 
     {
-        // RAII Guard: Если при конструировании вылетит исключение, удалит уже созданное
+        // RAII guard: if construction throws, it will destroy what was already created
         template <typename T>
         struct destroy_guard 
         {
@@ -75,7 +75,7 @@ namespace mystl
             
             constexpr void release() noexcept 
             {
-                first = current; // Отмена удаления (всё прошло успешно)
+                first = current; // Cancel destruction (everything completed successfully)
             }
         };
     }
@@ -128,7 +128,7 @@ namespace mystl
     {
         template <typename... Ts> using void_t = void;
 
-        // Фоллбэк: если rebind не найден, вытаскиваем шаблонные аргументы и меняем первый
+        // Fallback: if rebind is not found, extract the template arguments and replace the first one
         template <typename Alloc, typename U>
         struct rebind_fallback;
 
@@ -141,7 +141,7 @@ namespace mystl
         template <typename Alloc, typename U, typename = void>
         struct rebind_alloc_helper : rebind_fallback<Alloc, U> {};
 
-        // Магия SFINAE: если Alloc::rebind<U>::other существует, будет выбрана эта специализация
+        // SFINAE magic: if Alloc::rebind<U>::other exists, this specialization will be selected
         template <typename Alloc, typename U>
         struct rebind_alloc_helper<Alloc, U, void_t<typename Alloc::template rebind<U>::other>> 
         {

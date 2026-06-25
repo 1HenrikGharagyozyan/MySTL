@@ -2,18 +2,16 @@
 
 #include "deque.hpp"
 #include "utility.hpp"
-
-#include <memory>
-#include <type_traits>
+#include "type_traits.hpp"
 
 namespace mystl 
 {
-
+    // By default, mystl::Deque is used, but List can be passed instead
     template <typename T, typename Container = mystl::Deque<T>>
     class Queue 
     {
     protected:
-        Container c_; // Underlying container (by default our Deque)
+        Container c_; // Internal container
 
     public:
         using container_type  = Container;
@@ -23,13 +21,12 @@ namespace mystl
         using const_reference = typename Container::const_reference;
         using allocator_type  = typename Container::allocator_type;
 
-        static_assert(mystl::is_same<T, value_type>::value,
+        static_assert(mystl::is_same_v<T, value_type>,
                       "Queue<T, Container>: Container::value_type must be T");
 
         // ========================================================================
         // CONSTRUCTORS
         // ========================================================================
-        
         Queue() : c_() {}
         explicit Queue(const allocator_type& alloc) : c_(alloc) {}
         explicit Queue(const Container& cont) : c_(cont) {}
@@ -39,10 +36,15 @@ namespace mystl
         Queue(const Queue& other, const allocator_type& alloc) : c_(other.c_, alloc) {}
         Queue(Queue&& other, const allocator_type& alloc) : c_(mystl::move(other.c_), alloc) {}
 
+        Queue(const Queue& other) = default;
+        Queue(Queue&& other) noexcept = default;
+        Queue& operator=(const Queue& other) = default;
+        Queue& operator=(Queue&& other) noexcept = default;
+        ~Queue() = default;
+
         // ========================================================================
         // ELEMENT ACCESS
         // ========================================================================
-        
         [[nodiscard]] reference front() { return c_.front(); }
         [[nodiscard]] const_reference front() const { return c_.front(); }
         
@@ -50,9 +52,8 @@ namespace mystl
         [[nodiscard]] const_reference back() const { return c_.back(); }
 
         // ========================================================================
-        // CAPACITY
+        // SIZE
         // ========================================================================
-        
         [[nodiscard]] bool empty() const { return c_.empty(); }
         [[nodiscard]] size_type size() const { return c_.size(); }
         [[nodiscard]] allocator_type get_allocator() const noexcept { return c_.get_allocator(); }
@@ -60,7 +61,6 @@ namespace mystl
         // ========================================================================
         // MODIFIERS
         // ========================================================================
-        
         void push(const value_type& value) 
         { 
             c_.push_back(value); 
@@ -84,18 +84,15 @@ namespace mystl
 
         void swap(Queue& other) noexcept(noexcept(mystl::swap(c_, other.c_))) 
         {
-            using mystl::swap;
-            swap(c_, other.c_);
+            mystl::swap(c_, other.c_);
         }
     };
 
-} // namespace mystl
-
-namespace std
-{
-    template <typename T, typename Container, typename Alloc>
-    struct uses_allocator<mystl::Queue<T, Container>, Alloc>
-        : uses_allocator<Container, Alloc>
+    // Global swap function for ADL support
+    template <typename T, typename Container>
+    void swap(Queue<T, Container>& lhs, Queue<T, Container>& rhs) noexcept(noexcept(lhs.swap(rhs)))
     {
-    };
-}
+        lhs.swap(rhs);
+    }
+
+} // namespace mystl

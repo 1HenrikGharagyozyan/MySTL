@@ -119,13 +119,12 @@ TEST(PriorityQueueTest, MinHeapWithGreater)
     EXPECT_EQ(pq.top(), 40);
 }
 
-TEST(PriorityQueueTest, ConstructorFromRange) 
+TEST(PriorityQueueTest, ConstructorFromRange)
 {
-    std::vector<int> vec = {10, 50, 20, 30, 15};
-    
-    // make_heap will be invoked inside the constructor
+    mystl::Vector<int> vec = {10, 50, 20, 30, 15};
+
     PriorityQueue<int> pq(vec.begin(), vec.end());
-    
+
     EXPECT_EQ(pq.size(), 5);
     EXPECT_EQ(pq.top(), 50);
 }
@@ -149,8 +148,8 @@ TEST(PriorityQueueTest, RangeConstructionWithAllocator)
     using Alloc = StatefulAllocator<int>;
     using Container = mystl::Vector<int, Alloc>;
 
-    std::vector<int> values = {10, 50, 20, 30, 15};
-    PriorityQueue<int, Container> pq(values.begin(), values.end(), mystl::less<int>(), Alloc(7));
+    mystl::Vector<int> values = { 10, 50, 20, 30, 15};
+    PriorityQueue<int, Container> pq(values.begin(), values.end(), mystl::less(), Alloc(7));
 
     EXPECT_EQ(pq.get_allocator().id, 7);
     EXPECT_EQ(pq.size(), 5);
@@ -163,7 +162,7 @@ TEST(PriorityQueueTest, ContainerConstructionWithAllocator)
     using Container = mystl::Vector<int, Alloc>;
 
     Container values({10, 50, 20}, Alloc(1));
-    PriorityQueue<int, Container> pq(mystl::less<int>(), values, Alloc(9));
+    PriorityQueue<int, Container> pq(mystl::less(), values, Alloc(9));
 
     EXPECT_EQ(pq.get_allocator().id, 9);
     EXPECT_EQ(pq.size(), 3);

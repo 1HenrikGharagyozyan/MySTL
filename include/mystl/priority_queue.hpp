@@ -1,17 +1,17 @@
 #pragma once
 
 #include "utility.hpp"
-#include "algorithm.hpp" // Our heap algorithms
-#include "vector.hpp"   
+#include "algorithm.hpp"  // Our heap algorithms
+#include "functional.hpp" // Transparent comparators
+#include "vector.hpp"     // Default internal container
+#include "type_traits.hpp"// Metaprogramming without std::
 
 #include <cassert>
-#include <memory>
-#include <type_traits>
 
 namespace mystl 
 {
-
-    template <typename T, typename Container = mystl::Vector<T>, typename Compare = mystl::less<T>>
+    // NOTE: mystl::less no longer takes <T> because it is a transparent functor (C++14)
+    template <typename T, typename Container = mystl::Vector<T>, typename Compare = mystl::less>
     class PriorityQueue 
     {
     protected:
@@ -19,13 +19,14 @@ namespace mystl
         Compare   comp_;
 
     public:
+        using container_type    = Container;
         using value_type        = typename Container::value_type;
         using size_type         = typename Container::size_type;
         using reference         = typename Container::reference;
         using const_reference   = typename Container::const_reference;
         using allocator_type    = typename Container::allocator_type;
 
-        static_assert(mystl::is_same<T, value_type>::value,
+        static_assert(mystl::is_same_v<T, value_type>,
                       "PriorityQueue<T, Container>: Container::value_type must be T");
 
         // ========================================================================
@@ -104,8 +105,14 @@ namespace mystl
             mystl::make_heap(c_.begin(), c_.end(), comp_);
         }
 
+        PriorityQueue(const PriorityQueue& other) = default;
+        PriorityQueue(PriorityQueue&& other) noexcept = default;
+        PriorityQueue& operator=(const PriorityQueue& other) = default;
+        PriorityQueue& operator=(PriorityQueue&& other) noexcept = default;
+        ~PriorityQueue() = default;
+
         // ========================================================================
-        // ACCESS AND CAPACITY
+        // ACCESS AND SIZE
         // ========================================================================
 
         [[nodiscard]] const_reference top() const 
@@ -156,13 +163,14 @@ namespace mystl
         }
     };
 
-} // namespace mystl
-
-namespace std
-{
-    template <typename T, typename Container, typename Compare, typename Alloc>
-    struct uses_allocator<mystl::PriorityQueue<T, Container, Compare>, Alloc>
-        : std::uses_allocator<Container, Alloc>
+    // ========================================================================
+    // GLOBAL SWAP FOR ADL
+    // ========================================================================
+    template <typename T, typename Container, typename Compare>
+    void swap(PriorityQueue<T, Container, Compare>& lhs, PriorityQueue<T, Container, Compare>& rhs)
+        noexcept(noexcept(lhs.swap(rhs)))
     {
-    };
-}
+        lhs.swap(rhs);
+    }
+
+} // namespace mystl

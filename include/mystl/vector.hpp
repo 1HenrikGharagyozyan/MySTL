@@ -107,7 +107,7 @@ namespace mystl
             }
         }
 
-        Vector(Vector&& other) noexcept(allocator_traits_type::is_always_equal::value)
+        Vector(Vector&& other) noexcept
             : data_(other.data_), size_(other.size_), capacity_(other.capacity_), alloc_(mystl::move(other.alloc_)) 
         {
             other.data_ = nullptr;

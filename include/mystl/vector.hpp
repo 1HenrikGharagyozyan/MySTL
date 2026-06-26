@@ -96,12 +96,45 @@ namespace mystl
             }
         }
 
-        Vector(Vector&& other) noexcept
+        Vector(const Vector& other, const Allocator& alloc)
+            : alloc_(alloc)
+        {
+            if (other.size_ > 0)
+            {
+                capacity_ = size_ = other.size_;
+                data_ = allocator_traits_type::allocate(alloc_, capacity_);
+                mystl::uninitialized_copy(other.begin(), other.end(), data_);
+            }
+        }
+
+        Vector(Vector&& other) noexcept(allocator_traits_type::is_always_equal::value)
             : data_(other.data_), size_(other.size_), capacity_(other.capacity_), alloc_(mystl::move(other.alloc_)) 
         {
             other.data_ = nullptr;
             other.size_ = 0;
             other.capacity_ = 0;
+        }
+
+        Vector(Vector&& other, const Allocator& alloc)
+            : alloc_(alloc)
+        {
+            if (alloc_ == other.alloc_)
+            {
+                data_ = other.data_;
+                size_ = other.size_;
+                capacity_ = other.capacity_;
+
+                other.data_ = nullptr;
+                other.size_ = 0;
+                other.capacity_ = 0;
+            }
+            else
+            {
+                reserve(other.size_);
+
+                for (auto& x : other)
+                    push_back(mystl::move(x));
+            }
         }
 
         Vector& operator=(const Vector& other) 
@@ -197,6 +230,8 @@ namespace mystl
         [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
         [[nodiscard]] size_type size() const noexcept { return size_; }
         [[nodiscard]] size_type capacity() const noexcept { return capacity_; }
+        
+        [[nodiscard]] allocator_type get_allocator() const noexcept { return alloc_; }
 
         void reserve(size_type new_cap) 
         {

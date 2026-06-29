@@ -521,6 +521,13 @@ namespace mystl
         const_iterator cbegin() const noexcept { return begin(); }
         const_iterator cend() const noexcept { return end(); }
 
+        reverse_iterator rbegin() noexcept { return reverse_iterator(end()); }
+        reverse_iterator rend() noexcept { return reverse_iterator(begin()); }
+        const_reverse_iterator rbegin() const noexcept { return const_reverse_iterator(end()); }
+        const_reverse_iterator rend() const noexcept { return const_reverse_iterator(begin()); }
+        const_reverse_iterator crbegin() const noexcept { return const_reverse_iterator(cend()); }
+        const_reverse_iterator crend() const noexcept { return const_reverse_iterator(cbegin()); }
+
         template <typename... Args>
         mystl::Pair<iterator, bool> emplace_unique(Args&&... args) 
         {
@@ -552,10 +559,41 @@ namespace mystl
             else if (comp_(key, extract_key_(static_cast<Node*>(y)->value))) y->left = z;
             else y->right = z;
 
-            nil_->parent = root_; 
+            nil_->parent = root_;
             RBTreeAlgorithms::insert_fixup(z, root_, nil_);
             ++size_;
             return { iterator(z, nil_), true };
+        }
+
+        template <typename... Args>
+        iterator emplace_equal(Args&&... args)
+        {
+            if (!nil_) init_nil();
+
+            Node* z = create_node(nullptr, nil_, nil_, RBColor::Red, mystl::forward<Args>(args)...);
+            const Key& key = extract_key_(z->value);
+
+            BasePtr y = nil_;
+            BasePtr x = root_;
+
+            while (x != nil_)
+            {
+                y = x;
+                if (comp_(key, extract_key_(static_cast<Node*>(x)->value)))
+                    x = x->left;
+                else
+                    x = x->right;
+            }
+
+            z->parent = y;
+            if (y == nil_) root_ = z;
+            else if (comp_(key, extract_key_(static_cast<Node*>(y)->value))) y->left = z;
+            else y->right = z;
+
+            nil_->parent = root_;
+            RBTreeAlgorithms::insert_fixup(z, root_, nil_);
+            ++size_;
+            return iterator(z, nil_);
         }
 
         void clear() noexcept
@@ -669,13 +707,21 @@ namespace mystl
             return const_iterator(result, nil_);
         }
 
-        size_type erase(const Key& key) 
+        size_type erase(const Key& key)
         {
             iterator it = find(key);
-            if (it == end()) return 0; 
-            
+            if (it == end()) return 0;
+
             delete_node(it.node);
             return 1;
+        }
+
+        iterator erase(iterator pos)
+        {
+            iterator next = pos;
+            ++next;
+            delete_node(pos.node);
+            return next;
         }
 
         void swap(RBTree& other) noexcept 

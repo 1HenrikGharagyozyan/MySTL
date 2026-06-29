@@ -601,21 +601,38 @@ namespace mystl
             return find(key) != end();
         }
 
-        iterator lower_bound(const Key& key) noexcept 
+        iterator lower_bound(const Key& key) noexcept
         {
             if (!nil_) return end();
             BasePtr current = root_;
             BasePtr result = nil_;
-            while (current != nil_) 
+            while (current != nil_)
             {
-                if (!comp_(extract_key_(static_cast<Node*>(current)->value), key)) 
+                if (!comp_(extract_key_(static_cast<Node*>(current)->value), key))
                 {
-                    result = current; 
+                    result = current;
                     current = current->left;
-                } 
+                }
                 else current = current->right;
             }
             return iterator(result, nil_);
+        }
+
+        const_iterator lower_bound(const Key& key) const noexcept
+        {
+            if (!nil_) return end();
+            BasePtr current = root_;
+            BasePtr result = nil_;
+            while (current != nil_)
+            {
+                if (!comp_(extract_key_(static_cast<Node*>(current)->value), key))
+                {
+                    result = current;
+                    current = current->left;
+                }
+                else current = current->right;
+            }
+            return const_iterator(result, nil_);
         }
 
         iterator upper_bound(const Key& key) noexcept 
@@ -633,6 +650,23 @@ namespace mystl
                 else current = current->right;
             }
             return iterator(result, nil_);
+        }
+
+        const_iterator upper_bound(const Key& key) const noexcept 
+        {
+            if (!nil_) return end();
+            BasePtr current = root_;
+            BasePtr result = nil_;
+            while (current != nil_) 
+            {
+                if (comp_(key, extract_key_(static_cast<Node*>(current)->value))) 
+                {
+                    result = current; 
+                    current = current->left;
+                } 
+                else current = current->right;
+            }
+            return const_iterator(result, nil_);
         }
 
         size_type erase(const Key& key) 

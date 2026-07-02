@@ -137,19 +137,38 @@ namespace mystl
             }
         }
 
-        Vector& operator=(const Vector& other) 
+        Vector& operator=(const Vector& other)
         {
-            if (this != &other) 
+            if (this != &other)
             {
-                clear();
-                if (capacity_ < other.size_) 
+                // Strong guarantee: build the full copy in fresh storage first and
+                // commit only once it has succeeded. *this is left untouched if the
+                // allocation or any element copy throws, and size_ never describes
+                // raw memory.
+                pointer   new_data = nullptr;
+                size_type new_cap  = other.size_;
+
+                if (new_cap > 0)
                 {
-                    if (data_) allocator_traits_type::deallocate(alloc_, data_, capacity_);
-                    capacity_ = other.size_;
-                    data_ = allocator_traits_type::allocate(alloc_, capacity_);
+                    new_data = allocator_traits_type::allocate(alloc_, new_cap);
+                    try
+                    {
+                        mystl::uninitialized_copy(other.data_, other.data_ + other.size_, new_data);
+                    }
+                    catch (...)
+                    {
+                        allocator_traits_type::deallocate(alloc_, new_data, new_cap);
+                        throw;
+                    }
                 }
-                size_ = other.size_;
-                mystl::uninitialized_copy(other.data_, other.data_ + other.size_, data_);
+
+                // Commit: nothing below can throw.
+                mystl::destroy(data_, data_ + size_);
+                if (data_) allocator_traits_type::deallocate(alloc_, data_, capacity_);
+
+                data_     = new_data;
+                size_     = other.size_;
+                capacity_ = new_cap;
             }
             return *this;
         }

@@ -198,6 +198,108 @@ TEST(VectorTest, ReserveStrongGuaranteeOnThrowingCopy)
     ThrowOnCopy::copies_until_throw = -1;
 }
 
+TEST(VectorTest, CopyAssignStrongGuaranteeOnThrow)
+{
+    ThrowOnCopy::live_instances    = 0;
+    ThrowOnCopy::copies_until_throw = -1;
+
+    mystl::Vector<ThrowOnCopy> dst;
+    dst.emplace_back(1);
+    dst.emplace_back(2);
+    dst.emplace_back(3);
+
+    mystl::Vector<ThrowOnCopy> src;
+    src.emplace_back(10);
+    src.emplace_back(20);
+    src.emplace_back(30);
+    src.emplace_back(40);
+
+    const ThrowOnCopy* old_data = dst.data();
+    const auto old_size = dst.size();
+
+    // 3rd element copy throws while assigning src into dst.
+    ThrowOnCopy::copies_until_throw = 2;
+
+    bool threw = false;
+    try
+    {
+        dst = src;
+    }
+    catch (const std::runtime_error&)
+    {
+        threw = true;
+    }
+
+    ASSERT_TRUE(threw);
+
+    // Strong guarantee: dst is exactly as it was before the failed assignment.
+    EXPECT_EQ(dst.data(), old_data);
+    EXPECT_EQ(dst.size(), old_size);
+    EXPECT_EQ(dst[0].value, 1);
+    EXPECT_EQ(dst[1].value, 2);
+    EXPECT_EQ(dst[2].value, 3);
+
+    // src is likewise untouched (copy source).
+    EXPECT_EQ(src.size(), 4u);
+    EXPECT_EQ(src[3].value, 40);
+
+    ThrowOnCopy::copies_until_throw = -1;
+}
+
+TEST(VectorTest, CopyAssignLeaksNothingOnThrow)
+{
+    ThrowOnCopy::live_instances    = 0;
+    ThrowOnCopy::copies_until_throw = -1;
+
+    {
+        mystl::Vector<ThrowOnCopy> dst;
+        dst.emplace_back(1);
+        dst.emplace_back(2);
+
+        mystl::Vector<ThrowOnCopy> src;
+        src.emplace_back(10);
+        src.emplace_back(20);
+        src.emplace_back(30);
+
+        ThrowOnCopy::copies_until_throw = 1; // throw on 2nd copy during assignment
+
+        try
+        {
+            dst = src;
+        }
+        catch (const std::runtime_error&)
+        {
+        }
+
+        ThrowOnCopy::copies_until_throw = -1;
+    }
+
+    // No leak of the rolled-back temporary buffer, no double-free of dst/src.
+    EXPECT_EQ(ThrowOnCopy::live_instances, 0);
+}
+
+TEST(VectorTest, CopyAssignSucceedsNormally)
+{
+    mystl::Vector<int> dst = {1, 2};
+    mystl::Vector<int> src = {7, 8, 9, 10};
+
+    dst = src;
+
+    EXPECT_EQ(dst.size(), 4u);
+    EXPECT_EQ(dst[0], 7);
+    EXPECT_EQ(dst[3], 10);
+
+    // Deep copy: mutating dst must not touch src.
+    dst[0] = 99;
+    EXPECT_EQ(src[0], 7);
+
+    // Self-assignment is a no-op, not a corruption.
+    mystl::Vector<int>& alias = dst;
+    dst = alias;
+    EXPECT_EQ(dst.size(), 4u);
+    EXPECT_EQ(dst[3], 10);
+}
+
 TEST(VectorTest, ReallocationLeaksNothingOnThrow)
 {
     ThrowOnCopy::live_instances    = 0;

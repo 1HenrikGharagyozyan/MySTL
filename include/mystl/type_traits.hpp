@@ -179,4 +179,13 @@ namespace mystl
     template <typename T>
     inline constexpr bool is_trivially_destructible_v = __has_trivial_destructor(T);
 
+    template <typename T>
+    inline constexpr bool is_copy_constructible_v = __is_constructible(T, const T&);
+
+    template <typename T>
+    inline constexpr bool is_move_constructible_v = __is_constructible(T, T&&);
+
+    template <typename T>
+    inline constexpr bool is_nothrow_move_constructible_v = __is_nothrow_constructible(T, T&&);
+
 } // namespace mystl

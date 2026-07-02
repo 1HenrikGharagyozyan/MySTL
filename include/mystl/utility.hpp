@@ -14,6 +14,20 @@
             return static_cast<remove_reference_t<T>&&>(arg);
         }
 
+        // Moves when T's move constructor is noexcept (or T is not copyable),
+        // otherwise yields a const lvalue reference so the source survives a
+        // throwing transfer. Foundation for the strong exception guarantee on
+        // container reallocation.
+        template <typename T>
+        constexpr conditional_t<
+            !is_nothrow_move_constructible_v<T> && is_copy_constructible_v<T>,
+            const T&,
+            T&&
+        > move_if_noexcept(T& arg) noexcept
+        {
+            return mystl::move(arg);
+        }
+
         template <typename T>
         constexpr T&& forward(remove_reference_t<T>& arg) noexcept
         {

@@ -110,14 +110,32 @@ namespace mystl
     }
 
     template <typename InputIt, typename ForwardIt>
-    ForwardIt uninitialized_move(InputIt first, InputIt last, ForwardIt d_first) 
+    ForwardIt uninitialized_move(InputIt first, InputIt last, ForwardIt d_first)
     {
         using ValueType = typename mystl::iterator_traits<ForwardIt>::value_type;
         detail::destroy_guard<ValueType> guard{mystl::addressof(*d_first), mystl::addressof(*d_first)};
-        
-        for (; first != last; ++first, (void)++d_first) 
+
+        for (; first != last; ++first, (void)++d_first)
         {
             mystl::construct_at(mystl::addressof(*d_first), mystl::move(*first));
+            ++guard.current;
+        }
+        guard.release();
+        return d_first;
+    }
+
+    // Like uninitialized_move, but transfers each element via mystl::move_if_noexcept.
+    // If T's move can throw, elements are copied instead, leaving the source range
+    // intact so the caller can offer the strong exception guarantee.
+    template <typename InputIt, typename ForwardIt>
+    ForwardIt uninitialized_move_if_noexcept(InputIt first, InputIt last, ForwardIt d_first)
+    {
+        using ValueType = typename mystl::iterator_traits<ForwardIt>::value_type;
+        detail::destroy_guard<ValueType> guard{mystl::addressof(*d_first), mystl::addressof(*d_first)};
+
+        for (; first != last; ++first, (void)++d_first)
+        {
+            mystl::construct_at(mystl::addressof(*d_first), mystl::move_if_noexcept(*first));
             ++guard.current;
         }
         guard.release();

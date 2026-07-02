@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include <string>
+#include <cstddef>
+#include <new>
 #include "mystl/unordered_map.hpp"
 
 using namespace mystl;
@@ -92,4 +94,110 @@ TEST(UnorderedMapTest, IteratorIteration)
 
     EXPECT_EQ(sum_keys, 6);
     EXPECT_EQ(sum_vals, 60);
+}
+
+// ============================================================================
+// ALLOCATOR-EXTENDED MOVE: PROPAGATION CORRECTNESS (Blocker #3, Part 2)
+// ============================================================================
+namespace
+{
+    // Per-id outstanding-bytes ledger so a free through the wrong allocator id
+    // leaves a detectable imbalance.
+    struct AllocLedger
+    {
+        static inline long long outstanding[8] = {};
+        static void      reset()      { for (auto& x : outstanding) x = 0; }
+        static long long total()      { long long s = 0; for (auto x : outstanding) s += x; return s; }
+    };
+
+    // Stateful (not always-equal: it has a data member), equality by id.
+    template <typename T>
+    struct CountingAlloc
+    {
+        using value_type = T;
+        int id = 0;
+
+        template <typename U> struct rebind { using other = CountingAlloc<U>; };
+
+        CountingAlloc() = default;
+        explicit CountingAlloc(int i) : id(i) {}
+        template <typename U> CountingAlloc(const CountingAlloc<U>& o) : id(o.id) {}
+
+        T* allocate(std::size_t n)
+        {
+            AllocLedger::outstanding[id] += static_cast<long long>(n * sizeof(T));
+            return static_cast<T*>(::operator new(n * sizeof(T)));
+        }
+        void deallocate(T* p, std::size_t n) noexcept
+        {
+            AllocLedger::outstanding[id] -= static_cast<long long>(n * sizeof(T));
+            ::operator delete(p);
+        }
+    };
+
+    template <typename T, typename U>
+    bool operator==(const CountingAlloc<T>& a, const CountingAlloc<U>& b) noexcept { return a.id == b.id; }
+    template <typename T, typename U>
+    bool operator!=(const CountingAlloc<T>& a, const CountingAlloc<U>& b) noexcept { return !(a == b); }
+
+    using CountedMap = UnorderedMap<int, int, mystl::hash<int>, mystl::equal_to,
+                                    CountingAlloc<mystl::Pair<const int, int>>>;
+}
+
+TEST(UnorderedMapAllocTest, AllocExtendedMoveStealsWithEqualAllocator)
+{
+    // Sanity: this allocator is genuinely stateful (exercises the runtime path).
+    static_assert(!mystl::allocator_traits<CountingAlloc<int>>::is_always_equal::value,
+                  "CountingAlloc must not be always-equal");
+
+    AllocLedger::reset();
+    {
+        CountedMap src; // default allocator id == 0
+        src[1] = 10;
+        src[2] = 20;
+        src[3] = 30;
+
+        // Destination allocator id 0 == source id 0  => O(1) steal.
+        CountedMap dst(mystl::move(src), CountingAlloc<mystl::Pair<const int, int>>(0));
+
+        EXPECT_EQ(dst.size(), 3u);
+        EXPECT_EQ(dst.at(1), 10);
+        EXPECT_EQ(dst.at(2), 20);
+        EXPECT_EQ(dst.at(3), 30);
+        EXPECT_TRUE(src.empty());
+    }
+    EXPECT_EQ(AllocLedger::total(), 0); // no leak
+    EXPECT_EQ(AllocLedger::outstanding[0], 0);
+}
+
+TEST(UnorderedMapAllocTest, AllocExtendedMoveMovesElementsWithUnequalAllocator)
+{
+    AllocLedger::reset();
+    {
+        CountedMap src; // allocator id 0
+        src[1] = 10;
+        src[2] = 20;
+        src[3] = 30;
+
+        // Destination allocator id 2 != source id 0 => element-wise move into
+        // storage owned by id 2. Source's id-0 storage must be freed via id 0.
+        CountedMap dst(mystl::move(src), CountingAlloc<mystl::Pair<const int, int>>(2));
+
+        EXPECT_EQ(dst.size(), 3u);
+        EXPECT_EQ(dst.at(1), 10);
+        EXPECT_EQ(dst.at(2), 20);
+        EXPECT_EQ(dst.at(3), 30);
+        EXPECT_TRUE(src.empty());
+
+        // dst allocated fresh storage under id 2 (elements were moved, not stolen).
+        EXPECT_GT(AllocLedger::outstanding[2], 0);
+        // src still legitimately owns its (now element-less) bucket array under id 0;
+        // its nodes were already released through id 0 by the element-move.
+        EXPECT_GT(AllocLedger::outstanding[0], 0);
+    }
+    // After both are destroyed everything is balanced *per id*: had dst stolen
+    // src's id-0 storage and freed it through id 2, these would not both be zero.
+    EXPECT_EQ(AllocLedger::outstanding[0], 0);
+    EXPECT_EQ(AllocLedger::outstanding[2], 0);
+    EXPECT_EQ(AllocLedger::total(), 0);
 }

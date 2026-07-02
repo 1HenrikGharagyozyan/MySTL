@@ -42,9 +42,9 @@ add_executable(test_unordered_map test_unordered_map.cpp)
 target_link_libraries(test_unordered_map PRIVATE mystl GTest::gtest_main)
 gtest_discover_tests(test_unordered_map)
 
-# add_executable(test_unordered_set test_unordered_set.cpp)
-# target_link_libraries(test_unordered_set PRIVATE mystl GTest::gtest_main)
-# gtest_discover_tests(test_unordered_set)
+add_executable(test_unordered_set test_unordered_set.cpp)
+target_link_libraries(test_unordered_set PRIVATE mystl GTest::gtest_main)
+gtest_discover_tests(test_unordered_set)
 
 # add_executable(test_unordered_multiset test_unordered_multiset.cpp)
 # target_link_libraries(test_unordered_multiset PRIVATE mystl GTest::gtest_main)

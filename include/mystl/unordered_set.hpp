@@ -1,74 +1,124 @@
 #pragma once
 
 #include "utility.hpp"
+#include "functional.hpp"
+#include "allocator.hpp"
+#include "memory.hpp"
 #include <cstddef>
-#include <functional>
-#include <cassert>
+#include <stdexcept>
 
 namespace mystl 
 {
-    // We use the same default hashers as for the map (this can be moved to a shared file later)
-    template <typename Key>
-    struct hash_set 
-    {
-        size_t operator()(const Key& key) const { return std::hash<Key>{}(key); }
-    };
-
-    template <typename T>
-    struct equal_to_set 
-    {
-        constexpr bool operator()(const T& lhs, const T& rhs) const { return lhs == rhs; }
-    };
 
     template <
         typename Key, 
-        typename Hash = mystl::hash_set<Key>, 
-        typename KeyEqual = mystl::equal_to_set<Key>
+        typename Hash      = mystl::hash<Key>, 
+        typename KeyEqual  = mystl::equal_to,
+        typename Allocator = mystl::Allocator<Key>
     >
     class UnorderedSet 
     {
     public:
         using key_type        = Key;
-        using value_type      = Key; // In a set, the key and value are the same
+        using value_type      = Key; 
         using size_type       = std::size_t;
+        using difference_type = std::ptrdiff_t;
         using hasher          = Hash;
         using key_equal       = KeyEqual;
+        using allocator_type  = Allocator;
         using reference       = value_type&;
         using const_reference = const value_type&;
+        using pointer         = typename mystl::allocator_traits<Allocator>::pointer;
+        using const_pointer   = typename mystl::allocator_traits<Allocator>::const_pointer;
 
     private:
         struct Node 
         {
-            value_type value; // We store only the key, saving memory!
+            value_type value;
             Node* next;
 
             template <typename... Args>
             Node(Node* n, Args&&... args) 
-                : value(mystl::forward<Args>(args)...), next(n) {}
+                : value(mystl::forward<Args>(args)...)
+                , next(n) 
+            {
+            }
         };
+
+        using node_allocator_type   = typename mystl::allocator_traits<Allocator>::template rebind_alloc<Node>;
+        using node_traits           = mystl::allocator_traits<node_allocator_type>;
+        using bucket_allocator_type = typename mystl::allocator_traits<Allocator>::template rebind_alloc<Node*>;
+        using bucket_traits         = mystl::allocator_traits<bucket_allocator_type>;
 
         Node** buckets_         = nullptr;
         size_type bucket_count_    = 0;
         size_type size_            = 0;
         float     max_load_factor_ = 1.0f;
-        hasher    hash_func_;
-        key_equal equal_func_;
 
+        [[no_unique_address]] node_allocator_type   node_alloc_;
+        [[no_unique_address]] bucket_allocator_type bucket_alloc_;
+        [[no_unique_address]] hasher                hash_func_;
+        [[no_unique_address]] key_equal             equal_func_;
+
+        // ========================================================================
+        // PRIVATE ALLOCATION HELPERS
+        // ========================================================================
         size_type get_bucket_index(const Key& key, size_type b_count) const 
         {
             return hash_func_(key) % b_count;
         }
 
+        Node** allocate_buckets(size_type n)
+        {
+            Node** p = bucket_traits::allocate(bucket_alloc_, n);
+            for (size_type i = 0; i < n; ++i) p[i] = nullptr;
+            return p;
+        }
+
+        void deallocate_buckets(Node** p, size_type n) noexcept
+        {
+            bucket_traits::deallocate(bucket_alloc_, p, n);
+        }
+
+        template <typename... Args>
+        Node* create_node(Node* next, Args&&... args)
+        {
+            Node* p = node_traits::allocate(node_alloc_, 1);
+            try
+            {
+                node_traits::construct(node_alloc_, p, next, mystl::forward<Args>(args)...);
+            }
+            catch (...)
+            {
+                node_traits::deallocate(node_alloc_, p, 1);
+                throw;
+            }
+            return p;
+        }
+
+        void destroy_node(Node* p) noexcept
+        {
+            node_traits::destroy(node_alloc_, p);
+            node_traits::deallocate(node_alloc_, p, 1);
+        }
+
     public:
         // ========================================================================
-        // ITERATORS (Smart Iterator)
+        // ITERATORS
         // ========================================================================
         class ConstIterator 
         {
             friend class UnorderedSet;
+        public:
+            using iterator_category = mystl::forward_iterator_tag;
+            using value_type        = UnorderedSet::value_type;
+            using difference_type   = UnorderedSet::difference_type;
+            using pointer           = UnorderedSet::const_pointer;
+            using reference         = UnorderedSet::const_reference;
+
         private:
             const Node* node_;
-            size_type bucket_idx_;
+            size_type           bucket_idx_;
             const UnorderedSet* set_;
 
             ConstIterator(const Node* node, size_type b_idx, const UnorderedSet* set)
@@ -79,7 +129,9 @@ namespace mystl
             }
 
         public:
-            const_reference operator*() const { return node_->value; }
+            ConstIterator() : node_(nullptr), bucket_idx_(0), set_(nullptr) {}
+
+            const_reference   operator*()  const { return node_->value; }
             const value_type* operator->() const { return &(node_->value); }
 
             ConstIterator& operator++() 
@@ -110,13 +162,12 @@ namespace mystl
             bool operator!=(const ConstIterator& other) const { return node_ != other.node_; }
         };
 
-        // In std::unordered_set, iterator and const_iterator are the same, 
-        // so the user cannot modify the key through a reference.
-        using iterator = ConstIterator;
+        // For std::unordered_set, iterator is a constant iterator.
+        using iterator       = ConstIterator;
         using const_iterator = ConstIterator;
 
-        iterator begin() const noexcept { return cbegin(); }
-        iterator end() const noexcept { return cend(); }
+        iterator       begin()  const noexcept { return cbegin(); }
+        iterator       end()    const noexcept { return cend(); }
         const_iterator cbegin() const noexcept 
         {
             for (size_type i = 0; i < bucket_count_; ++i) 
@@ -128,43 +179,72 @@ namespace mystl
         const_iterator cend() const noexcept { return const_iterator(nullptr, bucket_count_, this); }
 
         // ========================================================================
-        // LIFETIME (Rule of Five)
+        // CONSTRUCTORS, DESTRUCTOR, RULE OF FIVE
         // ========================================================================
         UnorderedSet() : UnorderedSet(8) {}
         
-        explicit UnorderedSet(size_type bucket_count, const hasher& hf = hasher(), const key_equal& eql = key_equal())
+        explicit UnorderedSet(size_type bucket_count, 
+                              const hasher&    hf  = hasher(), 
+                              const key_equal& eql = key_equal())
             : bucket_count_(bucket_count)
             , hash_func_(hf)
             , equal_func_(eql)
         {
-            buckets_ = new Node*[bucket_count_](); 
+            buckets_ = allocate_buckets(bucket_count_);
         }
 
         ~UnorderedSet() 
         {
             clear();
-            delete[] buckets_;
+            if (buckets_)
+                deallocate_buckets(buckets_, bucket_count_);
         }
 
         UnorderedSet(const UnorderedSet& other)
             : bucket_count_(other.bucket_count_)
             , max_load_factor_(other.max_load_factor_)
+            , node_alloc_(node_traits::select_on_container_copy_construction(other.node_alloc_))
+            , bucket_alloc_(bucket_traits::select_on_container_copy_construction(other.bucket_alloc_))
             , hash_func_(other.hash_func_)
             , equal_func_(other.equal_func_)
         {
-            buckets_ = new Node*[bucket_count_]();
+            buckets_ = allocate_buckets(bucket_count_);
             for (size_type i = 0; i < other.bucket_count_; ++i) 
             {
                 Node* curr = other.buckets_[i];
                 Node* prev = nullptr;
                 while (curr) 
                 {
-                    Node* new_node = new Node(nullptr, curr->value);
+                    Node* new_node = create_node(nullptr, curr->value);
                     if (!prev) buckets_[i] = new_node;
                     else prev->next = new_node;
                     prev = new_node;
                     curr = curr->next;
-                    size_++;
+                    ++size_;
+                }
+            }
+        }
+
+        UnorderedSet(const UnorderedSet& other, const allocator_type& alloc)
+            : bucket_count_(other.bucket_count_)
+            , max_load_factor_(other.max_load_factor_)
+            , node_alloc_(alloc)
+            , hash_func_(other.hash_func_)
+            , equal_func_(other.equal_func_)
+        {
+            buckets_ = allocate_buckets(bucket_count_);
+            for (size_type i = 0; i < other.bucket_count_; ++i) 
+            {
+                Node* curr = other.buckets_[i];
+                Node* prev = nullptr;
+                while (curr) 
+                {
+                    Node* new_node = create_node(nullptr, curr->value);
+                    if (!prev) buckets_[i] = new_node;
+                    else prev->next = new_node;
+                    prev = new_node;
+                    curr = curr->next;
+                    ++size_;
                 }
             }
         }
@@ -174,12 +254,28 @@ namespace mystl
             , bucket_count_(other.bucket_count_)
             , size_(other.size_)
             , max_load_factor_(other.max_load_factor_)
+            , node_alloc_(mystl::move(other.node_alloc_))
+            , bucket_alloc_(mystl::move(other.bucket_alloc_))
             , hash_func_(mystl::move(other.hash_func_))
             , equal_func_(mystl::move(other.equal_func_))
         {
-            other.buckets_ = nullptr;
+            other.buckets_      = nullptr;
             other.bucket_count_ = 0;
-            other.size_ = 0;
+            other.size_         = 0;
+        }
+
+        UnorderedSet(UnorderedSet&& other, const allocator_type& alloc) noexcept
+            : buckets_(other.buckets_)
+            , bucket_count_(other.bucket_count_)
+            , size_(other.size_)
+            , max_load_factor_(other.max_load_factor_)
+            , node_alloc_(alloc)
+            , hash_func_(mystl::move(other.hash_func_))
+            , equal_func_(mystl::move(other.equal_func_))
+        {
+            other.buckets_      = nullptr;
+            other.bucket_count_ = 0;
+            other.size_         = 0;
         }
 
         UnorderedSet& operator=(const UnorderedSet& other) 
@@ -197,14 +293,20 @@ namespace mystl
             if (this != &other) 
             {
                 clear();
-                delete[] buckets_;
-                buckets_ = other.buckets_;
-                bucket_count_ = other.bucket_count_;
-                size_ = other.size_;
+                if (buckets_) deallocate_buckets(buckets_, bucket_count_);
+
+                buckets_         = other.buckets_;
+                bucket_count_    = other.bucket_count_;
+                size_            = other.size_;
                 max_load_factor_ = other.max_load_factor_;
-                other.buckets_ = nullptr;
+                node_alloc_      = mystl::move(other.node_alloc_);
+                bucket_alloc_    = mystl::move(other.bucket_alloc_);
+                hash_func_       = mystl::move(other.hash_func_);
+                equal_func_      = mystl::move(other.equal_func_);
+
+                other.buckets_      = nullptr;
                 other.bucket_count_ = 0;
-                other.size_ = 0;
+                other.size_         = 0;
             }
             return *this;
         }
@@ -212,9 +314,18 @@ namespace mystl
         // ========================================================================
         // SIZE AND STATE
         // ========================================================================
-        [[nodiscard]] bool empty() const noexcept { return size_ == 0; }
-        [[nodiscard]] size_type size() const noexcept { return size_; }
-        [[nodiscard]] float load_factor() const noexcept { return bucket_count_ == 0 ? 0.0f : static_cast<float>(size_) / bucket_count_; }
+        [[nodiscard]] bool      empty()        const noexcept { return size_ == 0; }
+        [[nodiscard]] size_type size()         const noexcept { return size_; }
+        [[nodiscard]] size_type bucket_count() const noexcept { return bucket_count_; }
+        
+        [[nodiscard]] float load_factor() const noexcept 
+        { 
+            return bucket_count_ == 0 ? 0.0f : static_cast<float>(size_) / bucket_count_; 
+        }
+        
+        [[nodiscard]] float          max_load_factor() const noexcept { return max_load_factor_; }
+        [[nodiscard]] allocator_type get_allocator()   const noexcept { return allocator_type(node_alloc_); }
+
         void clear() noexcept 
         {
             for (size_type i = 0; i < bucket_count_; ++i) 
@@ -223,7 +334,7 @@ namespace mystl
                 while (curr) 
                 {
                     Node* next = curr->next;
-                    delete curr;
+                    destroy_node(curr);
                     curr = next;
                 }
                 buckets_[i] = nullptr;
@@ -237,7 +348,7 @@ namespace mystl
         const_iterator find(const Key& key) const 
         {
             if (bucket_count_ == 0) return cend();
-            size_type idx = get_bucket_index(key, bucket_count_);
+            size_type   idx  = get_bucket_index(key, bucket_count_);
             const Node* curr = buckets_[idx];
             while (curr) 
             {
@@ -258,7 +369,9 @@ namespace mystl
         void rehash(size_type new_count) 
         {
             if (new_count <= bucket_count_) return;
-            Node** new_buckets = new Node*[new_count]();
+            
+            Node** new_buckets = allocate_buckets(new_count);
+            
             for (size_type i = 0; i < bucket_count_; ++i) 
             {
                 Node* curr = buckets_[i];
@@ -271,7 +384,8 @@ namespace mystl
                     curr = next_node;
                 }
             }
-            delete[] buckets_;
+            
+            if (buckets_) deallocate_buckets(buckets_, bucket_count_);
             buckets_ = new_buckets;
             bucket_count_ = new_count;
         }
@@ -279,13 +393,13 @@ namespace mystl
         template <typename... Args>
         mystl::Pair<iterator, bool> emplace(Args&&... args) 
         {
-            Node* new_node = new Node(nullptr, mystl::forward<Args>(args)...);
+            Node* new_node = create_node(nullptr, mystl::forward<Args>(args)...);
             const Key& key = new_node->value;
 
             iterator it = find(key);
             if (it != end()) 
             {
-                delete new_node; 
+                destroy_node(new_node); 
                 return { it, false };
             }
 
@@ -297,18 +411,18 @@ namespace mystl
             size_type idx = get_bucket_index(key, bucket_count_);
             new_node->next = buckets_[idx];
             buckets_[idx] = new_node;
-            size_++;
+            ++size_;
 
             return {iterator(new_node, idx, this), true};
         }
 
         mystl::Pair<iterator, bool> insert(const value_type& value) { return emplace(value); }
-        mystl::Pair<iterator, bool> insert(value_type&& value) { return emplace(mystl::move(value)); }
+        mystl::Pair<iterator, bool> insert(value_type&& value)      { return emplace(mystl::move(value)); }
 
         size_type erase(const Key& key) 
         {
             if (bucket_count_ == 0) return 0;
-            size_type idx = get_bucket_index(key, bucket_count_);
+            size_type idx  = get_bucket_index(key, bucket_count_);
             Node* curr = buckets_[idx];
             Node* prev = nullptr;
 
@@ -318,8 +432,8 @@ namespace mystl
                 {
                     if (!prev) buckets_[idx] = curr->next;
                     else prev->next = curr->next;
-                    delete curr;
-                    size_--;
+                    destroy_node(curr);
+                    --size_;
                     return 1;
                 }
                 prev = curr;
@@ -330,10 +444,14 @@ namespace mystl
 
         void swap(UnorderedSet& other) noexcept 
         {
-            mystl::swap(buckets_, other.buckets_);
-            mystl::swap(bucket_count_, other.bucket_count_);
-            mystl::swap(size_, other.size_);
+            mystl::swap(buckets_,         other.buckets_);
+            mystl::swap(bucket_count_,    other.bucket_count_);
+            mystl::swap(size_,            other.size_);
             mystl::swap(max_load_factor_, other.max_load_factor_);
+            mystl::swap(node_alloc_,      other.node_alloc_);
+            mystl::swap(bucket_alloc_,    other.bucket_alloc_);
+            mystl::swap(hash_func_,       other.hash_func_);
+            mystl::swap(equal_func_,      other.equal_func_);
         }
     };
 

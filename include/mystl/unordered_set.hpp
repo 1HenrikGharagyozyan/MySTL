@@ -102,6 +102,56 @@ namespace mystl
             node_traits::deallocate(node_alloc_, p, 1);
         }
 
+        // Allocator-extended move helper: take over the source's storage when our
+        // allocator can free it (always-equal, or compares equal), otherwise move
+        // the elements into storage owned by our allocator so the source's memory
+        // is never released through the wrong allocator.
+        void adopt_or_move(UnorderedSet& other)
+        {
+            bool take_ownership;
+            if constexpr (node_traits::is_always_equal::value)
+                take_ownership = true;
+            else
+                take_ownership = (node_alloc_ == other.node_alloc_);
+
+            if (take_ownership)
+            {
+                buckets_ = other.buckets_;
+                size_    = other.size_;
+                other.buckets_      = nullptr;
+                other.bucket_count_ = 0;
+                other.size_         = 0;
+                return;
+            }
+
+            buckets_ = allocate_buckets(bucket_count_);
+            try
+            {
+                for (size_type i = 0; i < other.bucket_count_; ++i)
+                {
+                    Node* curr = other.buckets_[i];
+                    Node* prev = nullptr;
+                    while (curr)
+                    {
+                        Node* new_node = create_node(nullptr, mystl::move(curr->value));
+                        if (!prev) buckets_[i] = new_node;
+                        else       prev->next  = new_node;
+                        prev = new_node;
+                        curr = curr->next;
+                        ++size_;
+                    }
+                }
+            }
+            catch (...)
+            {
+                clear();
+                deallocate_buckets(buckets_, bucket_count_);
+                buckets_ = nullptr;
+                throw;
+            }
+            other.clear();
+        }
+
     public:
         // ========================================================================
         // ITERATORS
@@ -264,18 +314,15 @@ namespace mystl
             other.size_         = 0;
         }
 
-        UnorderedSet(UnorderedSet&& other, const allocator_type& alloc) noexcept
-            : buckets_(other.buckets_)
-            , bucket_count_(other.bucket_count_)
-            , size_(other.size_)
+        UnorderedSet(UnorderedSet&& other, const allocator_type& alloc)
+            : bucket_count_(other.bucket_count_)
             , max_load_factor_(other.max_load_factor_)
             , node_alloc_(alloc)
+            , bucket_alloc_(alloc)
             , hash_func_(mystl::move(other.hash_func_))
             , equal_func_(mystl::move(other.equal_func_))
         {
-            other.buckets_      = nullptr;
-            other.bucket_count_ = 0;
-            other.size_         = 0;
+            adopt_or_move(other);
         }
 
         UnorderedSet& operator=(const UnorderedSet& other) 
